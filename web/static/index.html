@@ -159,6 +159,11 @@
             border: 1px solid var(--surface-border);
         }
 
+        .stats-message {
+            font-size: 0.95rem;
+            color: var(--secondary-text);
+        }
+
         /* Loading */
         .loading {
             text-align: center;
@@ -232,11 +237,48 @@
         }
 
         .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
             background: var(--meta-tag-bg);
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             font-size: 0.75rem;
             color: var(--muted-text);
+            border: none;
+            line-height: 1;
+        }
+
+        .meta-link {
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .meta-link:hover {
+            background: var(--secondary-bg-hover);
+            color: var(--text-color);
+        }
+
+        .meta-link:focus-visible,
+        .link-button:focus-visible,
+        .filter-chip:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        .link-button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            text-decoration: underline;
+        }
+
+        .link-button:hover {
+            color: var(--primary-color-hover);
         }
 
         .book-annotation {
@@ -306,6 +348,40 @@
         .empty-icon {
             font-size: 3rem;
             margin-bottom: 1rem;
+        }
+
+        .active-filters {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        .filters-label {
+            color: var(--muted-text);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
+            border: 1px solid var(--surface-border);
+            border-radius: 999px;
+            padding: 0.3rem 0.75rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .filter-chip:hover {
+            background: var(--secondary-bg-hover);
+            color: var(--text-color);
         }
 
         /* Responsive */
@@ -541,11 +617,34 @@
             <div class="container">
                 <!-- Stats -->
                 <div class="stats" v-if="!loading">
-                    <div v-if="searchQuery">
-                        Найдено <strong>{{ totalBooks }}</strong> книг по запросу "{{ searchQuery }}"
+                    <div class="stats-message">
+                        <template v-if="searchQuery">
+                            Найдено <strong>{{ totalBooks }}</strong> книг по запросу "{{ searchQuery }}"
+                        </template>
+                        <template v-else-if="selectedAuthorFilter || selectedSeriesFilter">
+                            Показаны книги
+                            <span v-if="selectedAuthorFilter"> автора <strong>{{ selectedAuthorFilter }}</strong></span>
+                            <span v-if="selectedSeriesFilter"> из серии <strong>{{ selectedSeriesFilter }}</strong></span>
+                            <span v-if="!selectedAuthorFilter && !selectedSeriesFilter"> (нет активных фильтров)</span>
+                        </template>
+                        <template v-else>
+                            Всего в библиотеке <strong>{{ totalBooks }}</strong> книг
+                        </template>
                     </div>
-                    <div v-else>
-                        Всего в библиотеке <strong>{{ totalBooks }}</strong> книг
+
+                    <div class="active-filters" v-if="selectedAuthorFilter || selectedSeriesFilter">
+                        <span class="filters-label">Фильтры:</span>
+                        <button class="filter-chip" type="button" v-if="selectedAuthorFilter" @click="clearAuthorFilter">
+                            ✍️ {{ selectedAuthorFilter }}
+                            <span aria-hidden="true">×</span>
+                        </button>
+                        <button class="filter-chip" type="button" v-if="selectedSeriesFilter" @click="clearSeriesFilter">
+                            📚 {{ selectedSeriesFilter }}
+                            <span aria-hidden="true">×</span>
+                        </button>
+                        <button class="filter-chip" type="button" v-if="selectedAuthorFilter && selectedSeriesFilter" @click="clearAllFilters">
+                            Сбросить все
+                        </button>
                     </div>
                 </div>
 
@@ -570,14 +669,17 @@
                             <div class="book-card" v-for="book in columnBooks" :key="book.id">
                                 <div class="book-title" v-html="highlightText(book.title)"></div>
                                 <div class="book-authors" v-if="book.authors && book.authors.length > 0">
-                                    {{ book.authors.map(a => a.name).join(', ') }}
+                                    <template v-for="(author, index) in book.authors" :key="author.id">
+                                        <button type="button" class="link-button" @click="filterByAuthor(author.name)">{{ author.name }}</button>
+                                        <span v-if="index < book.authors.length - 1">, </span>
+                                    </template>
                                 </div>
 
                                 <div class="book-meta">
-                                    <span class="meta-tag" v-if="book.series">
+                                    <button type="button" class="meta-tag meta-link" v-if="book.series" @click="filterBySeries(book.series.name, book.authors && book.authors.length > 0 ? book.authors[0].name : null)">
                                         📚 {{ book.series.name }}
                                         <span v-if="book.series_num"> #{{ book.series_num }}</span>
-                                    </span>
+                                    </button>
                                     <span class="meta-tag" v-if="book.genre">
                                         🏷️ {{ readableGenre(book.genre.name) }}
                                     </span>
@@ -651,14 +753,21 @@
                         <!-- Authors -->
                         <div class="detail-section" v-if="selectedBook.authors && selectedBook.authors.length > 0">
                             <div class="detail-label">Авторы:</div>
-                            <div class="detail-value">{{ selectedBook.authors.map(a => a.name).join(', ') }}</div>
+                            <div class="detail-value">
+                                <template v-for="(author, index) in selectedBook.authors" :key="author.id">
+                                    <button type="button" class="link-button" @click="filterByAuthor(author.name)">{{ author.name }}</button>
+                                    <span v-if="index < selectedBook.authors.length - 1">, </span>
+                                </template>
+                            </div>
                         </div>
 
                         <!-- Series -->
                         <div class="detail-section" v-if="selectedBook.series">
                             <div class="detail-label">Серия:</div>
                             <div class="detail-value">
-                                {{ selectedBook.series.name }}
+                                <button type="button" class="link-button" @click="filterBySeries(selectedBook.series.name, selectedBook.authors && selectedBook.authors.length > 0 ? selectedBook.authors[0].name : null)">
+                                    {{ selectedBook.series.name }}
+                                </button>
                                 <span v-if="selectedBook.series_num" class="series-number">#{{ selectedBook.series_num }}</span>
                             </div>
                         </div>
@@ -733,6 +842,8 @@
                     debounceTimer: null,
                     apiBase: window.location.origin + '/api/v1',
                     selectedBook: null,
+                    selectedAuthorFilter: null,
+                    selectedSeriesFilter: null,
                     theme: 'light',
                     themeMediaQuery: null,
                     systemThemeListener: null,
@@ -784,6 +895,14 @@
 
                         if (this.searchQuery.trim()) {
                             params.append('q', this.searchQuery.trim());
+                        }
+
+                        if (this.selectedAuthorFilter) {
+                            params.append('authors', this.selectedAuthorFilter);
+                        }
+
+                        if (this.selectedSeriesFilter) {
+                            params.append('series', this.selectedSeriesFilter);
                         }
 
                         const response = await axios.get(`${this.apiBase}/books?${params}`);
@@ -884,6 +1003,76 @@
                     }
 
                     return this.genreMap[normalized] || code;
+                },
+
+                filterByAuthor(name) {
+                    if (!name) {
+                        return;
+                    }
+
+                    this.selectedAuthorFilter = name;
+                    this.currentPage = 1;
+                    this.searchQuery = '';
+                    if (this.selectedBook) {
+                        this.closeModal();
+                    }
+                    this.loadBooks();
+                },
+
+                filterBySeries(seriesName, authorName = null) {
+                    if (!seriesName) {
+                        return;
+                    }
+
+                    this.selectedSeriesFilter = seriesName;
+                    if (authorName) {
+                        this.selectedAuthorFilter = authorName;
+                    }
+                    this.currentPage = 1;
+                    this.searchQuery = '';
+                    if (this.selectedBook) {
+                        this.closeModal();
+                    }
+                    this.loadBooks();
+                },
+
+                clearAuthorFilter() {
+                    if (!this.selectedAuthorFilter) {
+                        return;
+                    }
+
+                    this.selectedAuthorFilter = null;
+                    this.currentPage = 1;
+                    if (this.selectedBook) {
+                        this.closeModal();
+                    }
+                    this.loadBooks();
+                },
+
+                clearSeriesFilter() {
+                    if (!this.selectedSeriesFilter) {
+                        return;
+                    }
+
+                    this.selectedSeriesFilter = null;
+                    this.currentPage = 1;
+                    if (this.selectedBook) {
+                        this.closeModal();
+                    }
+                    this.loadBooks();
+                },
+
+                clearAllFilters() {
+                    if (!this.selectedAuthorFilter && !this.selectedSeriesFilter) {
+                        return;
+                    }
+                    this.selectedAuthorFilter = null;
+                    this.selectedSeriesFilter = null;
+                    this.currentPage = 1;
+                    if (this.selectedBook) {
+                        this.closeModal();
+                    }
+                    this.loadBooks();
                 },
 
                 toggleTheme() {
