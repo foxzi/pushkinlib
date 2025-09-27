@@ -1156,27 +1156,51 @@
 
                         const text = await response.text();
                         const lines = text.split(/\r?\n/);
+                        if (lines.length <= 1) {
+                            return;
+                        }
+
+                        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+                        const codeIndex = headers.indexOf('code');
+                        const nameRuIndex = headers.indexOf('name_ru');
+
+                        if (codeIndex === -1 || nameRuIndex === -1) {
+                            throw new Error('genre CSV missing required columns code,name_ru');
+                        }
+
                         const map = {};
 
                         for (let i = 1; i < lines.length; i++) {
-                            const line = lines[i].trim();
-                            if (!line) continue;
+                            const line = lines[i];
+                            if (!line || !line.trim()) continue;
 
-                            const commaIndex = line.indexOf(',');
-                            if (commaIndex === -1) {
+                            const cells = [];
+                            let current = '';
+                            let inQuotes = false;
+
+                            for (let charIndex = 0; charIndex < line.length; charIndex++) {
+                                const ch = line[charIndex];
+                                if (ch === '"') {
+                                    inQuotes = !inQuotes;
+                                    continue;
+                                }
+                                if (ch === ',' && !inQuotes) {
+                                    cells.push(current);
+                                    current = '';
+                                    continue;
+                                }
+                                current += ch;
+                            }
+                            cells.push(current);
+
+                            const key = (cells[codeIndex] || '').trim().toLowerCase();
+                            const valueRaw = (cells[nameRuIndex] || '').trim();
+
+                            if (!key) {
                                 continue;
                             }
 
-                            const key = line.slice(0, commaIndex).trim().toLowerCase();
-                            let value = line.slice(commaIndex + 1).trim();
-
-                            if (!key) continue;
-
-                            if (value.startsWith('"') && value.endsWith('"')) {
-                                value = value.slice(1, -1);
-                            }
-
-                            map[key] = value || key;
+                            map[key] = valueRaw || key;
                         }
 
                         this.genreMap = map;
