@@ -1,0 +1,187 @@
+code,name_ru,name_en
+accounting,Бухгалтерский учет,Accounting
+adv_animal,Приключения о животных,Animal adventures
+adv_geo,Приключения о путешествиях,Travel adventures
+adv_history,Исторические приключения,Historical adventures
+adv_maritime,Морские приключения,Maritime adventures
+adv_western,Вестерн,Western
+adventure,Приключения,Adventure
+antique,Античная литература,Antique literature
+antique_ant,Античная литература,Antique literature
+antique_east,Восточная античная литература,Eastern antique literature
+antique_european,Европейская античная литература,European antique literature
+antique_myths,Мифы,Myths
+antique_russian,Русская античная литература,Russian antique literature
+aphorism_quote,Афоризмы и цитаты,Aphorisms and quotes
+architecture_book,Архитектура,Architecture
+auto_regulations,Автомобили и правила,Automotive regulations
+banking,Банковское дело,Banking
+beginning_authors,Начинающие авторы,Beginning authors
+child_adv,Детские приключения,Children's adventures
+child_det,Детский детектив,Children's detective
+child_education,Детская образовательная литература,Children's education
+child_prose,Детская проза,Children's prose
+child_sf,Детская фантастика,Children's science fiction
+child_tale,Детские сказки,Children's tales
+child_verse,Детские стихи,Children's verse
+children,Детская литература,Children's literature
+cinema_theatre,Кино и театр,Cinema and theatre
+city_fantasy,Городское фэнтези,Urban fantasy
+comp_db,Базы данных,Databases
+comp_hard,Компьютерное железо,Computer hardware
+comp_osnet,Операционные системы и сети,Operating systems and networks
+comp_programming,Программирование,Programming
+comp_soft,Программное обеспечение,Software
+comp_www,Интернет и веб,Internet and web
+computers,Компьютеры,Computers
+design,Дизайн,Design
+det_action,Боевик-детектив,Action detective
+det_classic,Классический детектив,Classic detective
+det_crime,Криминальный детектив,Crime detective
+det_espionage,Шпионский детектив,Espionage detective
+det_hard,Жёсткий детектив,Hard-boiled detective
+det_history,Исторический детектив,Historical detective
+det_irony,Иронический детектив,Ironic detective
+det_police,Полицейский детектив,Police detective
+det_political,Политический детектив,Political detective
+detective,Детектив,Detective
+dragon_fantasy,Драконье фэнтези,Dragon fantasy
+dramaturgy,Драматургия,Dramaturgy
+economics,Экономика,Economics
+essays,Эссе,Essays
+fantasy_fight,Боевое фэнтези,Battle fantasy
+foreign_action,Зарубежный боевик,Foreign action
+foreign_adventure,Зарубежные приключения,Foreign adventure
+foreign_antique,Зарубежная античная литература,Foreign antique literature
+foreign_business,Зарубежная деловая литература,Foreign business
+foreign_children,Зарубежная детская литература,Foreign children's literature
+foreign_comp,Зарубежная компьютерная литература,Foreign computer literature
+foreign_contemporary,Современная зарубежная литература,Foreign contemporary
+foreign_contemporary_lit,Современная зарубежная проза,Foreign contemporary literature
+foreign_desc,Зарубежная документалистика,Foreign documentary
+foreign_detective,Зарубежный детектив,Foreign detective
+foreign_dramaturgy,Зарубежная драматургия,Foreign dramaturgy
+foreign_edu,Зарубежная образовательная литература,Foreign educational
+foreign_fantasy,Зарубежное фэнтези,Foreign fantasy
+foreign_home,Зарубежная домоводство,Foreign home & lifestyle
+foreign_humor,Зарубежный юмор,Foreign humor
+foreign_language,Иностранные языки,Foreign languages
+foreign_love,Зарубежный любовный роман,Foreign romance
+foreign_novel,Зарубежный роман,Foreign novel
+foreign_other,Зарубежная прочая литература,Foreign other
+foreign_poetry,Зарубежная поэзия,Foreign poetry
+foreign_prose,Зарубежная проза,Foreign prose
+foreign_psychology,Зарубежная психология,Foreign psychology
+foreign_publicism,Зарубежная публицистика,Foreign journalism
+foreign_religion,Зарубежная религиозная литература,Foreign religious literature
+foreign_sf,Зарубежная фантастика,Foreign science fiction
+geo_guides,Путеводители,Guidebooks
+geography_book,География,Geography
+global_economy,Мировая экономика,Global economy
+historical_fantasy,Историческое фэнтези,Historical fantasy
+home,Дом и быт,Home & lifestyle
+home_cooking,Кулинария,Cooking
+home_crafts,Рукоделие,Crafts
+home_diy,Сделай сам,DIY
+home_entertain,Развлечения,Entertainment
+home_garden,Сад и огород,Gardening
+home_health,Здоровье,Health
+home_pets,Домашние животные,Pets
+home_sex,Сексология,Sexuality
+home_sport,Спорт,Sports
+humor,Юмор,Humor
+humor_anecdote,Анекдоты,Anecdotes
+humor_fantasy,Юмористическое фэнтези,Humorous fantasy
+humor_prose,Юмористическая проза,Humorous prose
+humor_verse,Юмористические стихи,Humorous verse
+industries,Промышленность,Industries
+job_hunting,Поиск работы,Job hunting
+literature_18,Литература 18 века,18th century literature
+literature_19,Литература 19 века,19th century literature
+literature_20,Литература 20 века,20th century literature
+love_contemporary,Современный любовный роман,Contemporary romance
+love_detective,Любовный детектив,Romantic detective
+love_erotica,Эротика,Erotica
+love_fantasy,Любовное фэнтези,Romantic fantasy
+love_history,Исторический любовный роман,Historical romance
+love_sf,Любовно-фантастический роман,Romantic science fiction
+love_short,Короткий любовный роман,Short romance
+magician_book,Магия,Magic
+management,Менеджмент,Management
+marketing,Маркетинг,Marketing
+military_special,Военная специальная литература,Military special
+music_dancing,Музыка и танцы,Music and dance
+narrative,Документальная проза,Narrative
+newspapers,Газеты,Newspapers
+nonf_biography,Биографии,Biography
+nonf_criticism,Критика,Criticism
+nonf_publicism,Публицистика,Journalism
+nonfiction,Документальная литература,Non-fiction
+org_behavior,Организационное поведение,Organizational behavior
+paper_work,Делопроизводство,Paperwork
+pedagogy_book,Педагогика,Pedagogy
+periodic,Периодика,Periodicals
+personal_finance,Личные финансы,Personal finance
+poetry,Поэзия,Poetry
+popadanec,Попаданцы,Portal fantasy
+popular_business,Популярный бизнес,Popular business
+prose_classic,Классическая проза,Classic prose
+prose_counter,Контркультурная проза,Counterculture prose
+prose_history,Историческая проза,Historical prose
+prose_military,Военная проза,Military prose
+prose_rus_classic,Русская классическая проза,Russian classic prose
+prose_su_classics,Советская классика,Soviet classics
+psy_alassic,Классическая психология,Classic psychology
+psy_childs,Детская психология,Child psychology
+psy_generic,Общая психология,General psychology
+psy_personal,Личностный рост,Personal development
+psy_sex_and_family,Психология семьи и секса,Family and sex psychology
+psy_social,Социальная психология,Social psychology
+psy_theraphy,Психотерапия,Psychotherapy
+real_estate,Недвижимость,Real estate
+ref_dict,Словари,Dictionaries
+ref_encyc,Энциклопедии,Encyclopedias
+ref_guide,Руководства,Guides
+ref_ref,Справочники,Reference books
+reference,Справочная литература,Reference
+religion,Религия,Religion
+religion_esoterics,Эзотерика,Esoterics
+religion_rel,Религиозная литература,Religious literature
+religion_self,Самосовершенствование,Self-improvement
+russian_contemporary,Современная русская литература,Contemporary Russian literature
+russian_fantasy,Русское фэнтези,Russian fantasy
+sci_biology,Биология,Biology
+sci_chem,Химия,Chemistry
+sci_culture,Культурология,Cultural studies
+sci_history,История,History
+sci_juris,Юриспруденция,Law
+sci_linguistic,Лингвистика,Linguistics
+sci_math,Математика,Mathematics
+sci_medicine,Медицина,Medicine
+sci_philosophy,Философия,Philosophy
+sci_phys,Физика,Physics
+sci_politics,Политика,Politics
+sci_religion,Религиоведение,Religious studies
+sci_tech,Техника,Technology
+science,Научная литература,Science
+sf,Фантастика,Science fiction
+sf_action,Боевая фантастика,Action science fiction
+sf_cyberpunk,Киберпанк,Cyberpunk
+sf_detective,Детективная фантастика,Detective science fiction
+sf_fantasy,Фэнтези,Fantasy
+sf_heroic,Героическая фантастика,Heroic fantasy
+sf_history,Альтернативная история,Alternate history
+sf_horror,Ужасы,Horror
+sf_humor,Юмористическая фантастика,Humorous science fiction
+sf_social,Социальная фантастика,Social science fiction
+sf_space,Космическая фантастика,Space science fiction
+short_story,Короткие рассказы,Short stories
+sketch,Очерки,Sketches
+small_business,Малый бизнес,Small business
+sociology_book,Социология,Sociology
+stock,Биржа,Stock market
+thriller,Триллер,Thriller
+upbringing_book,Воспитание,Upbringing
+vampire_book,Вампиры,Vampire fiction
+visual_arts,Изобразительное искусство,Visual arts
+unrecognised,Неопознанный жанр,Unrecognised

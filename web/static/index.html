@@ -736,7 +736,9 @@
                     theme: 'light',
                     themeMediaQuery: null,
                     systemThemeListener: null,
-                    escapeKeyHandler: null
+                    escapeKeyHandler: null,
+                    genreMap: {},
+                    genresLoaded: false
                 };
             },
             computed: {
@@ -881,76 +883,7 @@
                         return code;
                     }
 
-                    const mapping = {
-                        'adv_history': 'Исторические приключения',
-                        'adv_indian': 'Приключения про индейцев',
-                        'adv_maritime': 'Морские приключения',
-                        'adv_western': 'Вестерн',
-                        'adv_geo': 'Приключения о путешествиях',
-                        'adv_animal': 'Приключения о животных',
-                        'detective': 'Детектив',
-                        'detective_history': 'Исторический детектив',
-                        'detective_hard': 'Полицейский детектив',
-                        'detective_soft': 'Любительский детектив',
-                        'detective_fem': 'Женский детектив',
-                        'detective_mean': 'Иронический детектив',
-                        'detective_thriller': 'Триллер',
-                        'kids': 'Детская литература',
-                        'kids_tale': 'Сказки',
-                        'kids_prose': 'Детская проза',
-                        'kids_sf': 'Детская фантастика',
-                        'nonf_biography': 'Биографии и мемуары',
-                        'nonf_criticism': 'Литературоведение',
-                        'nonf_publicism': 'Публицистика',
-                        'nonf_military': 'Военная тематика',
-                        'nonf_science': 'Наука и образование',
-                        'nonf_tech': 'Техническая литература',
-                        'nonf_business': 'Бизнес и экономика',
-                        'nonf_medicine': 'Медицина и здоровье',
-                        'nonf_religion': 'Религия',
-                        'sf_action': 'Боевая фантастика',
-                        'sf_history': 'Альтернативная история',
-                        'sf_heroic': 'Героическая фантастика',
-                        'sf_space': 'Космическая фантастика',
-                        'sf_cyberpunk': 'Киберпанк',
-                        'sf_epic': 'Эпическая фантастика',
-                        'sf_mystic': 'Мистическая фантастика',
-                        'sf_horror': 'Ужасы и мистика',
-                        'sf_postap': 'Постапокалипсис',
-                        'sf_social': 'Социальная фантастика',
-                        'sf_humor': 'Юмористическая фантастика',
-                        'sf_fantasy': 'Фэнтези',
-                        'sf_detective': 'Фантастический детектив',
-                        'sf_time_travel': 'Путешествия во времени',
-                        'sf_dystopia': 'Антиутопия',
-                        'fanfic': 'Фанфик',
-                        'romance': 'Романтика',
-                        'love_contemporary': 'Современный любовный роман',
-                        'love_history': 'Исторический любовный роман',
-                        'love_short': 'Короткий любовный роман',
-                        'love_erotic': 'Эротика',
-                        'humor': 'Юмор',
-                        'humor_satire': 'Сатира',
-                        'prose': 'Современная проза',
-                        'prose_classic': 'Классическая литература',
-                        'prose_history': 'Историческая проза',
-                        'prose_rus_classic': 'Русская классика',
-                        'prose_foreign_classic': 'Зарубежная классика',
-                        'prose_contemporary': 'Современная проза (зарубежная)',
-                        'prose_military': 'Военная проза',
-                        'prose_drama': 'Драма',
-                        'poetry': 'Поэзия',
-                        'business': 'Бизнес-литература',
-                        'home': 'Дом и быт',
-                        'health': 'Здоровье',
-                        'tourism': 'Путешествия и туризм',
-                        'reference': 'Справочная литература',
-                        'religion': 'Религия',
-                        'self_help': 'Саморазвитие',
-                        'hobby': 'Хобби и увлечения'
-                    };
-
-                    return mapping[normalized] || code;
+                    return this.genreMap[normalized] || code;
                 },
 
                 toggleTheme() {
@@ -1006,6 +939,48 @@
                     } catch (error) {
                         return null;
                     }
+                },
+
+                async loadGenreMap() {
+                    try {
+                        const response = await fetch(`${window.location.origin}/static/genres.csv`, {
+                            headers: { 'Cache-Control': 'no-cache' }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`failed to load genres: ${response.status}`);
+                        }
+
+                        const text = await response.text();
+                        const lines = text.split(/\r?\n/);
+                        const map = {};
+
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+
+                            const commaIndex = line.indexOf(',');
+                            if (commaIndex === -1) {
+                                continue;
+                            }
+
+                            const key = line.slice(0, commaIndex).trim().toLowerCase();
+                            let value = line.slice(commaIndex + 1).trim();
+
+                            if (!key) continue;
+
+                            if (value.startsWith('"') && value.endsWith('"')) {
+                                value = value.slice(1, -1);
+                            }
+
+                            map[key] = value || key;
+                        }
+
+                        this.genreMap = map;
+                        this.genresLoaded = true;
+                    } catch (error) {
+                        console.warn('Failed to load genre mapping:', error);
+                    }
                 }
             },
 
@@ -1034,6 +1009,8 @@
                     this.systemThemeListener = handler;
                     mediaQuery.addEventListener('change', handler);
                 }
+
+                this.loadGenreMap();
             },
 
             beforeUnmount() {
