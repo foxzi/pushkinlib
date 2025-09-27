@@ -105,11 +105,18 @@
         }
 
         /* Books grid */
-        .books-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        .books-columns {
+            display: flex;
             gap: 1.5rem;
             margin-bottom: 2rem;
+            align-items: flex-start;
+        }
+
+        .books-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
         .book-card {
@@ -234,8 +241,8 @@
                 max-width: none;
             }
 
-            .books-grid {
-                grid-template-columns: 1fr;
+            .books-columns {
+                flex-direction: column;
             }
 
             .container {
@@ -453,42 +460,54 @@
                     <div>Загрузка...</div>
                 </div>
 
-                <!-- Books grid -->
-                <div class="books-grid" v-else-if="books.length > 0">
-                    <div class="book-card" v-for="book in books" :key="book.id">
-                        <div class="book-title" v-html="highlightText(book.title)"></div>
-                        <div class="book-authors" v-if="book.authors && book.authors.length > 0">
-                            {{ book.authors.map(a => a.name).join(', ') }}
-                        </div>
+                <!-- Books columns -->
+                <div v-else-if="books.length > 0">
+                    <div
+                        class="books-columns"
+                        v-for="(columnSet, groupIndex) in bookColumnGroups"
+                        :key="`column-group-${groupIndex}`"
+                    >
+                        <div
+                            class="books-column"
+                            v-for="(columnBooks, columnIndex) in columnSet"
+                            :key="`column-${groupIndex}-${columnIndex}`"
+                        >
+                            <div class="book-card" v-for="book in columnBooks" :key="book.id">
+                                <div class="book-title" v-html="highlightText(book.title)"></div>
+                                <div class="book-authors" v-if="book.authors && book.authors.length > 0">
+                                    {{ book.authors.map(a => a.name).join(', ') }}
+                                </div>
 
-                        <div class="book-meta">
-                            <span class="meta-tag" v-if="book.series">
-                                📚 {{ book.series.name }}
-                                <span v-if="book.series_num"> #{{ book.series_num }}</span>
-                            </span>
-                            <span class="meta-tag" v-if="book.genre">
-                                🏷️ {{ book.genre.name }}
-                            </span>
-                            <span class="meta-tag" v-if="book.year">
-                                📅 {{ book.year }}
-                            </span>
-                            <span class="meta-tag" v-if="book.format">
-                                📄 {{ book.format.toUpperCase() }}
-                            </span>
-                            <span class="meta-tag" v-if="book.file_size">
-                                💾 {{ formatFileSize(book.file_size) }}
-                            </span>
-                        </div>
+                                <div class="book-meta">
+                                    <span class="meta-tag" v-if="book.series">
+                                        📚 {{ book.series.name }}
+                                        <span v-if="book.series_num"> #{{ book.series_num }}</span>
+                                    </span>
+                                    <span class="meta-tag" v-if="book.genre">
+                                        🏷️ {{ book.genre.name }}
+                                    </span>
+                                    <span class="meta-tag" v-if="book.year">
+                                        📅 {{ book.year }}
+                                    </span>
+                                    <span class="meta-tag" v-if="book.format">
+                                        📄 {{ book.format.toUpperCase() }}
+                                    </span>
+                                    <span class="meta-tag" v-if="book.file_size">
+                                        💾 {{ formatFileSize(book.file_size) }}
+                                    </span>
+                                </div>
 
-                        <div class="book-annotation" v-if="book.annotation" v-html="highlightText(book.annotation)"></div>
+                                <div class="book-annotation" v-if="book.annotation" v-html="highlightText(book.annotation)"></div>
 
-                        <div class="book-actions">
-                            <button class="btn btn-primary" @click="downloadBook(book)">
-                                📥 Скачать
-                            </button>
-                            <button class="btn btn-secondary" @click="showBookDetails(book)">
-                                📖 Подробнее
-                            </button>
+                                <div class="book-actions">
+                                    <button class="btn btn-primary" @click="downloadBook(book)">
+                                        📥 Скачать
+                                    </button>
+                                    <button class="btn btn-secondary" @click="showBookDetails(book)">
+                                        📖 Подробнее
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -624,6 +643,30 @@
             computed: {
                 totalPages() {
                     return Math.ceil(this.totalBooks / this.pageSize);
+                },
+                bookColumnGroups() {
+                    const columnsPerRow = 3;
+                    const maxPerColumn = 5;
+                    const chunkSize = columnsPerRow * maxPerColumn;
+                    const groups = [];
+                    const list = Array.isArray(this.books) ? this.books : [];
+
+                    for (let i = 0; i < list.length; i += chunkSize) {
+                        const chunk = list.slice(i, i + chunkSize);
+                        const columns = [];
+
+                        for (let col = 0; col < columnsPerRow; col++) {
+                            const start = col * maxPerColumn;
+                            const columnBooks = chunk.slice(start, start + maxPerColumn);
+                            if (columnBooks.length > 0) {
+                                columns.push(columnBooks);
+                            }
+                        }
+
+                        groups.push(columns);
+                    }
+
+                    return groups;
                 }
             },
             methods: {
