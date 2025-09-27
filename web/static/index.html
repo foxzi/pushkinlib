@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pushkinlib - Библиотека книг</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid #e1e5e9;
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 600px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        /* Main content */
+        .main {
+            padding: 2rem 0;
+        }
+
+        /* Stats */
+        .stats {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            text-align: center;
+            border: 1px solid #e1e5e9;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e1e5e9;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Books grid */
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .book-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid #e1e5e9;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .book-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .book-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1f2937;
+            line-height: 1.4;
+        }
+
+        .book-authors {
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .book-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .meta-tag {
+            background: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .book-annotation {
+            color: #4b5563;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .page-info {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .search-box {
+                max-width: none;
+            }
+
+            .books-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Highlight search terms */
+        .highlight {
+            background-color: #fef3c7;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            max-height: 90vh;
+            width: 90%;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e1e5e9;
+            background: #f8f9fa;
+        }
+
+        .modal-title {
+            flex: 1;
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            line-height: 1.4;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            margin-left: 1rem;
+            color: #6b7280;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: #374151;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .book-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .detail-section {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #374151;
+            min-width: 120px;
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            color: #4b5563;
+            flex: 1;
+            line-height: 1.5;
+        }
+
+        .series-number {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 0.125rem 0.375rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
+        }
+
+        .file-size {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .annotation-text {
+            text-align: justify;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            padding: 1.5rem;
+            border-top: 1px solid #e1e5e9;
+            background: #f8f9fa;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* Modal responsive */
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+
+            .modal-header, .modal-body, .modal-footer {
+                padding: 1rem;
+            }
+
+            .detail-section {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .detail-label {
+                min-width: auto;
+                font-size: 0.875rem;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">📚 Pushkinlib</div>
+                    <div class="search-box">
+                        <input
+                            type="text"
+                            class="search-input"
+                            placeholder="Поиск по названию, автору, серии..."
+                            v-model="searchQuery"
+                            @input="onSearchInput"
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <div class="container">
+                <!-- Stats -->
+                <div class="stats" v-if="!loading">
+                    <div v-if="searchQuery">
+                        Найдено <strong>{{ totalBooks }}</strong> книг по запросу "{{ searchQuery }}"
+                    </div>
+                    <div v-else>
+                        Всего в библиотеке <strong>{{ totalBooks }}</strong> книг
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div class="loading" v-if="loading">
+                    <div class="spinner"></div>
+                    <div>Загрузка...</div>
+                </div>
+
+                <!-- Books grid -->
+                <div class="books-grid" v-else-if="books.length > 0">
+                    <div class="book-card" v-for="book in books" :key="book.id">
+                        <div class="book-title" v-html="highlightText(book.title)"></div>
+                        <div class="book-authors" v-if="book.authors && book.authors.length > 0">
+                            {{ book.authors.map(a => a.name).join(', ') }}
+                        </div>
+
+                        <div class="book-meta">
+                            <span class="meta-tag" v-if="book.series">
+                                📚 {{ book.series.name }}
+                                <span v-if="book.series_num"> #{{ book.series_num }}</span>
+                            </span>
+                            <span class="meta-tag" v-if="book.genre">
+                                🏷️ {{ book.genre.name }}
+                            </span>
+                            <span class="meta-tag" v-if="book.year">
+                                📅 {{ book.year }}
+                            </span>
+                            <span class="meta-tag" v-if="book.format">
+                                📄 {{ book.format.toUpperCase() }}
+                            </span>
+                            <span class="meta-tag" v-if="book.file_size">
+                                💾 {{ formatFileSize(book.file_size) }}
+                            </span>
+                        </div>
+
+                        <div class="book-annotation" v-if="book.annotation" v-html="highlightText(book.annotation)"></div>
+
+                        <div class="book-actions">
+                            <button class="btn btn-primary" @click="downloadBook(book)">
+                                📥 Скачать
+                            </button>
+                            <button class="btn btn-secondary" @click="showBookDetails(book)">
+                                📖 Подробнее
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div class="empty-state" v-else-if="!loading">
+                    <div class="empty-icon">📖</div>
+                    <div v-if="searchQuery">
+                        <h3>Ничего не найдено</h3>
+                        <p>Попробуйте изменить поисковый запрос</p>
+                    </div>
+                    <div v-else>
+                        <h3>Библиотека пуста</h3>
+                        <p>Книги не найдены</p>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" v-if="books.length > 0 && !loading">
+                    <button class="btn btn-secondary" @click="loadPrevPage" :disabled="currentPage <= 1">
+                        ← Предыдущая
+                    </button>
+
+                    <div class="page-info">
+                        Страница {{ currentPage }} из {{ totalPages }}
+                        ({{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, totalBooks) }} из {{ totalBooks }})
+                    </div>
+
+                    <button class="btn btn-secondary" @click="loadNextPage" :disabled="currentPage >= totalPages">
+                        Следующая →
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Book Details Modal -->
+        <div class="modal-overlay" v-if="selectedBook" @click="closeModal">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h2 class="modal-title">{{ selectedBook.title }}</h2>
+                    <button class="modal-close" @click="closeModal">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="book-details">
+                        <!-- Authors -->
+                        <div class="detail-section" v-if="selectedBook.authors && selectedBook.authors.length > 0">
+                            <div class="detail-label">Авторы:</div>
+                            <div class="detail-value">{{ selectedBook.authors.map(a => a.name).join(', ') }}</div>
+                        </div>
+
+                        <!-- Series -->
+                        <div class="detail-section" v-if="selectedBook.series">
+                            <div class="detail-label">Серия:</div>
+                            <div class="detail-value">
+                                {{ selectedBook.series.name }}
+                                <span v-if="selectedBook.series_num" class="series-number">#{{ selectedBook.series_num }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Genre -->
+                        <div class="detail-section" v-if="selectedBook.genre">
+                            <div class="detail-label">Жанр:</div>
+                            <div class="detail-value">{{ selectedBook.genre.name }}</div>
+                        </div>
+
+                        <!-- Year -->
+                        <div class="detail-section" v-if="selectedBook.year">
+                            <div class="detail-label">Год издания:</div>
+                            <div class="detail-value">{{ selectedBook.year }}</div>
+                        </div>
+
+                        <!-- Language -->
+                        <div class="detail-section" v-if="selectedBook.language">
+                            <div class="detail-label">Язык:</div>
+                            <div class="detail-value">{{ selectedBook.language.toUpperCase() }}</div>
+                        </div>
+
+                        <!-- Format and size -->
+                        <div class="detail-section">
+                            <div class="detail-label">Формат:</div>
+                            <div class="detail-value">
+                                {{ selectedBook.format.toUpperCase() }}
+                                <span v-if="selectedBook.file_size" class="file-size">
+                                    ({{ formatFileSize(selectedBook.file_size) }})
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Date added -->
+                        <div class="detail-section" v-if="selectedBook.date_added">
+                            <div class="detail-label">Дата добавления:</div>
+                            <div class="detail-value">{{ formatDate(selectedBook.date_added) }}</div>
+                        </div>
+
+                        <!-- Annotation -->
+                        <div class="detail-section" v-if="selectedBook.annotation">
+                            <div class="detail-label">Аннотация:</div>
+                            <div class="detail-value annotation-text">{{ selectedBook.annotation }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @click="downloadBook(selectedBook)">
+                        📥 Скачать книгу
+                    </button>
+                    <button class="btn btn-secondary" @click="closeModal">
+                        Закрыть
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    books: [],
+                    searchQuery: '',
+                    loading: false,
+                    currentPage: 1,
+                    pageSize: 30,
+                    totalBooks: 0,
+                    debounceTimer: null,
+                    apiBase: window.location.origin + '/api/v1',
+                    selectedBook: null
+                };
+            },
+            computed: {
+                totalPages() {
+                    return Math.ceil(this.totalBooks / this.pageSize);
+                }
+            },
+            methods: {
+                async loadBooks() {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            limit: this.pageSize,
+                            offset: (this.currentPage - 1) * this.pageSize
+                        });
+
+                        if (this.searchQuery.trim()) {
+                            params.append('q', this.searchQuery.trim());
+                        }
+
+                        const response = await axios.get(`${this.apiBase}/books?${params}`);
+
+                        this.books = response.data.books || [];
+                        this.totalBooks = response.data.total || 0;
+                    } catch (error) {
+                        console.error('Error loading books:', error);
+                        alert('Ошибка загрузки книг: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                onSearchInput() {
+                    // Debounce search
+                    clearTimeout(this.debounceTimer);
+                    this.debounceTimer = setTimeout(() => {
+                        this.currentPage = 1;
+                        this.loadBooks();
+                    }, 300);
+                },
+
+                loadPrevPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.loadBooks();
+                        this.scrollToTop();
+                    }
+                },
+
+                loadNextPage() {
+                    if (this.currentPage < this.totalPages) {
+                        this.currentPage++;
+                        this.loadBooks();
+                        this.scrollToTop();
+                    }
+                },
+
+                scrollToTop() {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                highlightText(text) {
+                    if (!this.searchQuery.trim() || !text) return text;
+
+                    const query = this.searchQuery.trim();
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    return text.replace(regex, '<span class="highlight">$1</span>');
+                },
+
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                },
+
+                downloadBook(book) {
+                    const downloadUrl = `${window.location.origin}/download/${book.id}`;
+
+                    // Create a temporary link to trigger download
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = `${book.title}.${book.format}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                },
+
+                showBookDetails(book) {
+                    this.selectedBook = book;
+                },
+
+                closeModal() {
+                    this.selectedBook = null;
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('ru-RU', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            },
+
+            mounted() {
+                this.loadBooks();
+
+                // Handle Escape key to close modal
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && this.selectedBook) {
+                        this.closeModal();
+                    }
+                });
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
