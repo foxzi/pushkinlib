@@ -1,0 +1,30 @@
+# Local environment configuration
+.env
+*.local
+
+# Go build outputs
+/pushkinlib
+/catalog-generator
+*.exe
+*.exe~
+*.test
+*.out
+
+# Generated databases and caches
+cache/
+*.db
+*.db-shm
+*.db-wal
+
+# Generated catalogs and archives
+sample-data/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
