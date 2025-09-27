@@ -20,8 +20,8 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o pushkinlib ./cmd/pushkinlib
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o catalog-generator ./cmd/catalog-generator
+RUN CGO_ENABLED=1 GOOS=linux go build -tags sqlite_fts5 -a -installsuffix cgo -o pushkinlib ./cmd/pushkinlib
+RUN CGO_ENABLED=1 GOOS=linux go build -tags sqlite_fts5 -a -installsuffix cgo -o catalog-generator ./cmd/catalog-generator
 
 # Runtime stage
 FROM alpine:3.19

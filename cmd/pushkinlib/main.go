@@ -12,7 +12,7 @@ import (
 
 	"github.com/piligrim/pushkinlib/internal/api"
 	"github.com/piligrim/pushkinlib/internal/config"
-	"github.com/piligrim/pushkinlib/internal/inpx"
+	"github.com/piligrim/pushkinlib/internal/indexer"
 	"github.com/piligrim/pushkinlib/internal/opds"
 	"github.com/piligrim/pushkinlib/internal/storage"
 )
@@ -43,15 +43,21 @@ func main() {
 
 	if searchResult.Total == 0 {
 		fmt.Println("Database is empty, importing INPX data...")
-		if err := importINPX(cfg, repo); err != nil {
+		result, err := indexer.ReindexFromINPX(repo, cfg.INPXPath)
+		if err != nil {
 			log.Fatalf("Failed to import INPX: %v", err)
 		}
+		collectionName := "INPX"
+		if result.Collection != nil && result.Collection.Name != "" {
+			collectionName = result.Collection.Name
+		}
+		fmt.Printf("Imported %d books from %s in %s\n", result.Imported, collectionName, result.Duration.Truncate(time.Millisecond))
 	} else {
 		fmt.Printf("Database contains %d books\n", searchResult.Total)
 	}
 
 	// Setup API routes
-	handlers := api.NewHandlers(repo, cfg.BooksDir)
+	handlers := api.NewHandlers(repo, cfg.BooksDir, cfg.INPXPath)
 	router := api.SetupRoutes(handlers)
 
 	// Setup OPDS routes
@@ -94,42 +100,4 @@ func main() {
 	}
 
 	fmt.Println("Server stopped")
-}
-
-func importINPX(cfg *config.Config, repo *storage.Repository) error {
-	// Check if INPX file exists
-	if _, err := os.Stat(cfg.INPXPath); os.IsNotExist(err) {
-		return fmt.Errorf("INPX file not found: %s", cfg.INPXPath)
-	}
-
-	// Parse INPX
-	fmt.Println("Parsing INPX file...")
-	parser := inpx.NewParser()
-	books, collectionInfo, err := parser.ParseINPX(cfg.INPXPath)
-	if err != nil {
-		return fmt.Errorf("failed to parse INPX: %w", err)
-	}
-
-	fmt.Printf("Found %d books in collection: %s\n", len(books), collectionInfo.Name)
-
-	// Limit import for testing (remove this in production)
-	if len(books) > 1000 {
-		fmt.Printf("Limiting import to first 1000 books for testing...\n")
-		books = books[:1000]
-	}
-
-	// Clear existing data
-	fmt.Println("Clearing existing data...")
-	if err := repo.ClearAllBooks(); err != nil {
-		return fmt.Errorf("failed to clear existing data: %w", err)
-	}
-
-	// Insert books into database
-	fmt.Println("Inserting books into database...")
-	if err := repo.InsertBooks(books); err != nil {
-		return fmt.Errorf("failed to insert books: %w", err)
-	}
-
-	fmt.Printf("Successfully imported %d books!\n", len(books))
-	return nil
 }

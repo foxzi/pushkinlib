@@ -41,7 +41,11 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/books", handlers.SearchBooks)
 		r.Get("/books/{id}", handlers.GetBookByID)
+		r.Post("/admin/reindex", handlers.ReindexLibrary)
 	})
+
+	// Admin utility endpoints
+	r.Post("/admin/reindex", handlers.ReindexLibrary)
 
 	// Serve static files
 	staticDir := "./web/static"

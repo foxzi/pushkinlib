@@ -61,3 +61,13 @@ CREATE INDEX IF NOT EXISTS idx_genres_name ON genres(name);
 CREATE INDEX IF NOT EXISTS idx_series_name ON series(name);
 
 -- Full-text search will be implemented later when FTS5 is available
+
+-- Full-text search virtual table
+CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(
+    book_id UNINDEXED,
+    title,
+    annotation,
+    authors,
+    series,
+    tokenize='unicode61'
+);

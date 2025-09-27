@@ -3,6 +3,7 @@ package api
 import (
 	"archive/zip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/piligrim/pushkinlib/internal/indexer"
 	"github.com/piligrim/pushkinlib/internal/storage"
 )
 
@@ -18,14 +20,50 @@ import (
 type Handlers struct {
 	repo     *storage.Repository
 	booksDir string
+	inpxPath string
 }
 
 // NewHandlers creates new API handlers
-func NewHandlers(repo *storage.Repository, booksDir string) *Handlers {
+func NewHandlers(repo *storage.Repository, booksDir, inpxPath string) *Handlers {
 	return &Handlers{
 		repo:     repo,
 		booksDir: booksDir,
+		inpxPath: inpxPath,
 	}
+}
+
+// ReindexLibrary clears database and re-imports data from INPX
+func (h *Handlers) ReindexLibrary(w http.ResponseWriter, r *http.Request) {
+	result, err := indexer.ReindexFromINPX(h.repo, h.inpxPath)
+	if err != nil {
+		switch {
+		case errors.Is(err, indexer.ErrINPXPathEmpty):
+			http.Error(w, "INPX path is not configured", http.StatusInternalServerError)
+		case errors.Is(err, indexer.ErrINPXNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	collectionName := ""
+	collectionVersion := ""
+	if result.Collection != nil {
+		collectionName = result.Collection.Name
+		collectionVersion = result.Collection.Version
+	}
+
+	response := map[string]interface{}{
+		"status":      "ok",
+		"imported":    result.Imported,
+		"collection":  collectionName,
+		"version":     collectionVersion,
+		"duration_ms": result.Duration.Milliseconds(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // SearchBooks handles book search requests
@@ -170,7 +208,7 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 // HealthCheck handles health check requests
 func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
-		"status": "ok",
+		"status":  "ok",
 		"service": "pushkinlib",
 	}
 

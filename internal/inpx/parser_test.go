@@ -1,6 +1,7 @@
 package inpx
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -8,6 +9,13 @@ import (
 func TestParseINPX(t *testing.T) {
 	// Use the sample data
 	inpxPath := filepath.Join("..", "..", "sample-data", "flibusta_fb2_local.inpx")
+
+	if _, err := os.Stat(inpxPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("sample INPX file not found; skipping integration test")
+		}
+		t.Fatalf("failed to access INPX file: %v", err)
+	}
 
 	parser := NewParser()
 	books, collectionInfo, err := parser.ParseINPX(inpxPath)

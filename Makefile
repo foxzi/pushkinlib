@@ -30,8 +30,8 @@ help:
 # Build targets
 build:
 	@echo "Building Pushkinlib..."
-	go build -o pushkinlib ./cmd/pushkinlib
-	go build -o catalog-generator ./cmd/catalog-generator
+	CGO_ENABLED=1 go build -tags sqlite_fts5 -o pushkinlib ./cmd/pushkinlib
+	CGO_ENABLED=1 go build -tags sqlite_fts5 -o catalog-generator ./cmd/catalog-generator
 
 run: build
 	@echo "Starting Pushkinlib..."
@@ -39,7 +39,7 @@ run: build
 
 test:
 	@echo "Running tests..."
-	go test ./...
+	CGO_ENABLED=1 go test -tags sqlite_fts5 ./...
 
 clean:
 	@echo "Cleaning build artifacts..."
