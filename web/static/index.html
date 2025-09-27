@@ -208,6 +208,8 @@
             padding: 1.5rem;
             border: 1px solid var(--surface-border);
             transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
         }
 
         .book-card:hover {
@@ -530,7 +532,6 @@
         }
 
         .annotation-text {
-            text-align: justify;
             line-height: 1.6;
             white-space: pre-wrap;
         }
@@ -656,15 +657,11 @@
 
                 <!-- Books columns -->
                 <div v-else-if="books.length > 0">
-                    <div
-                        class="books-columns"
-                        v-for="(columnSet, groupIndex) in bookColumnGroups"
-                        :key="`column-group-${groupIndex}`"
-                    >
+                    <div class="books-columns">
                         <div
                             class="books-column"
-                            v-for="(columnBooks, columnIndex) in columnSet"
-                            :key="`column-${groupIndex}-${columnIndex}`"
+                            v-for="(columnBooks, columnIndex) in bookColumns"
+                            :key="`column-${columnIndex}`"
                         >
                             <div class="book-card" v-for="book in columnBooks" :key="book.id">
                                 <div class="book-title" v-html="highlightText(book.title)"></div>
@@ -862,11 +859,9 @@
                 totalPages() {
                     return Math.ceil(this.totalBooks / this.pageSize);
                 },
-                bookColumnGroups() {
+                bookColumns() {
                     const columnsPerRow = 3;
-                    const maxPerColumn = 5;
-                    const totalCapacity = columnsPerRow * maxPerColumn;
-                    const groups = [];
+                    const maxPerColumn = 10;
                     const list = Array.isArray(this.books) ? this.books : [];
 
                     const sortKey = (book) => {
@@ -883,22 +878,17 @@
                         return 0;
                     });
 
-                    for (let i = 0; i < sorted.length; i += totalCapacity) {
-                        const slice = sorted.slice(i, i + totalCapacity);
-                        const columns = [];
+                    const limited = sorted.slice(0, columnsPerRow * maxPerColumn);
+                    const columns = Array.from({ length: columnsPerRow }, () => []);
 
-                        for (let col = 0; col < columnsPerRow; col++) {
-                            const start = col * maxPerColumn;
-                            const columnBooks = slice.slice(start, start + maxPerColumn);
-                            if (columnBooks.length > 0) {
-                                columns.push(columnBooks);
-                            }
+                    limited.forEach((book, index) => {
+                        const columnIndex = Math.floor(index / maxPerColumn);
+                        if (columnIndex < columnsPerRow) {
+                            columns[columnIndex].push(book);
                         }
+                    });
 
-                        groups.push(columns);
-                    }
-
-                    return groups;
+                    return columns.filter((column) => column.length > 0);
                 },
                 themeToggleLabel() {
                     return this.theme === 'dark' ? '🌞 Светлая тема' : '🌙 Тёмная тема';
