@@ -680,9 +680,15 @@
                                         📚 {{ book.series.name }}
                                         <span v-if="book.series_num"> #{{ book.series_num }}</span>
                                     </button>
-                                    <span class="meta-tag" v-if="book.genre">
-                                        🏷️ {{ readableGenre(book.genre.name) }}
-                                    </span>
+                                    <template v-if="book.genre">
+                                        <span
+                                            class="meta-tag"
+                                            v-for="genreCode in parseGenres(book.genre.name)"
+                                            :key="`genre-${book.id}-${genreCode}`"
+                                        >
+                                            🏷️ {{ readableGenre(genreCode) }}
+                                        </span>
+                                    </template>
                                     <span class="meta-tag" v-if="book.year">
                                         📅 {{ book.year }}
                                     </span>
@@ -775,7 +781,7 @@
                         <!-- Genre -->
                         <div class="detail-section" v-if="selectedBook.genre">
                             <div class="detail-label">Жанр:</div>
-                            <div class="detail-value">{{ readableGenre(selectedBook.genre.name) }}</div>
+                            <div class="detail-value">{{ formatGenreList(selectedBook.genre.name) }}</div>
                         </div>
 
                         <!-- Year -->
@@ -1017,6 +1023,42 @@
                     }
 
                     return this.genreMap[normalized] || code;
+                },
+
+                parseGenres(rawValue) {
+                    if (!rawValue) {
+                        return [];
+                    }
+
+                    let values;
+                    if (Array.isArray(rawValue)) {
+                        values = rawValue;
+                    } else {
+                        values = String(rawValue).split(/[,;]+/);
+                    }
+
+                    const seen = new Set();
+                    const result = [];
+                    for (const item of values) {
+                        const cleaned = (item || '').trim();
+                        if (!cleaned) {
+                            continue;
+                        }
+                        const normalized = cleaned.toLowerCase();
+                        if (!seen.has(normalized)) {
+                            seen.add(normalized);
+                            result.push(cleaned);
+                        }
+                    }
+                    return result;
+                },
+
+                formatGenreList(rawValue) {
+                    const genres = this.parseGenres(rawValue);
+                    if (genres.length === 0) {
+                        return '';
+                    }
+                    return genres.map((code) => this.readableGenre(code)).join(', ');
                 },
 
                 filterByAuthor(name) {
