@@ -14,6 +14,12 @@ type Repository struct {
 	db *Database
 }
 
+const bookSelectColumns = `
+	b.id, b.title, b.series_id, b.series_num, b.genre_id, b.year,
+	b.language, b.file_size, b.archive_path, b.file_num, b.format,
+	b.date_added, b.rating, b.annotation, b.created_at, b.updated_at,
+	s.name as series_name, g.name as genre_name`
+
 // NewRepository creates a new repository
 func NewRepository(db *Database) *Repository {
 	return &Repository{db: db}
@@ -87,6 +93,19 @@ func (r *Repository) insertBookTx(tx *sql.Tx, book inpx.Book) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Update full-text search index
+	if _, err := tx.Exec("DELETE FROM books_fts WHERE book_id = ?", book.ID); err != nil {
+		return err
+	}
+
+	authorsText := strings.Join(book.Authors, " ")
+	if _, err := tx.Exec(
+		"INSERT INTO books_fts (book_id, title, annotation, authors, series) VALUES (?, ?, ?, ?, ?)",
+		book.ID, book.Title, book.Annotation, authorsText, book.Series,
+	); err != nil {
+		return err
 	}
 
 	return nil
@@ -166,23 +185,22 @@ func (r *Repository) getOrCreateGenreTx(tx *sql.Tx, name string) (int, error) {
 
 // SearchBooks searches books with filters
 func (r *Repository) SearchBooks(filter BookFilter) (*BookList, error) {
-	if filter.Limit <= 0 {
-		filter.Limit = 30
+	sanitized := filter
+	if sanitized.Limit <= 0 {
+		sanitized.Limit = 30
+	}
+	if sanitized.Offset < 0 {
+		sanitized.Offset = 0
 	}
 
-	// Build query
-	query := r.buildSearchQuery(filter)
-	args := r.buildSearchArgs(filter)
+	query, queryArgs, countQuery, countArgs := r.buildSearchSQL(sanitized)
 
-	// Simple total count for now
 	var total int
-	err := r.db.db.QueryRow("SELECT COUNT(*) FROM books").Scan(&total)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get total count: %w", err)
+	if err := r.db.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, fmt.Errorf("failed to count books: %w", err)
 	}
 
-	// Get books
-	rows, err := r.db.db.Query(query, args...)
+	rows, err := r.db.db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search query: %w", err)
 	}
@@ -195,7 +213,6 @@ func (r *Repository) SearchBooks(filter BookFilter) (*BookList, error) {
 			return nil, fmt.Errorf("failed to scan book: %w", err)
 		}
 
-		// Load authors for this book
 		authors, err := r.getBookAuthors(book.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load authors for book %s: %w", book.ID, err)
@@ -209,154 +226,183 @@ func (r *Repository) SearchBooks(filter BookFilter) (*BookList, error) {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	hasMore := filter.Offset+filter.Limit < total
-
 	return &BookList{
 		Books:   books,
 		Total:   total,
-		Limit:   filter.Limit,
-		Offset:  filter.Offset,
-		HasMore: hasMore,
+		Limit:   sanitized.Limit,
+		Offset:  sanitized.Offset,
+		HasMore: sanitized.Offset+sanitized.Limit < total,
 	}, nil
 }
 
-// buildSearchQuery builds the SQL query for book search
-func (r *Repository) buildSearchQuery(filter BookFilter) string {
-	query := `
-		SELECT b.id, b.title, b.series_id, b.series_num, b.genre_id, b.year,
-		       b.language, b.file_size, b.archive_path, b.file_num, b.format,
-		       b.date_added, b.rating, b.annotation, b.created_at, b.updated_at,
-		       s.name as series_name, g.name as genre_name
-		FROM books b
-		LEFT JOIN series s ON b.series_id = s.id
-		LEFT JOIN genres g ON b.genre_id = g.id`
+func (r *Repository) buildSearchSQL(filter BookFilter) (string, []interface{}, string, []interface{}) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
 
-	var conditions []string
-	var needsAuthorJoin bool
+	joins := []string{
+		"LEFT JOIN series s ON b.series_id = s.id",
+		"LEFT JOIN genres g ON b.genre_id = g.id",
+	}
+	conditions := make([]string, 0)
+	baseArgs := make([]interface{}, 0)
+	joinedAuthors := false
+	hasFTS := false
 
-	if filter.Query != "" {
-		// Search in title, annotation, and author names
-		needsAuthorJoin = true
-		conditions = append(conditions, "(b.title LIKE ? OR b.annotation LIKE ? OR a.name LIKE ?)")
+	addAuthorJoin := func() {
+		if !joinedAuthors {
+			joins = append(joins, "LEFT JOIN book_authors ba ON b.id = ba.book_id")
+			joins = append(joins, "LEFT JOIN authors a ON ba.author_id = a.id")
+			joinedAuthors = true
+		}
+	}
+
+	if strings.TrimSpace(filter.Query) != "" {
+		ftsQuery, fallback := prepareFTSSearch(filter.Query)
+		if ftsQuery != "" {
+			hasFTS = true
+			joins = append(joins, "JOIN books_fts ON books_fts.book_id = b.id")
+			conditions = append(conditions, "books_fts MATCH ?")
+			baseArgs = append(baseArgs, ftsQuery)
+		} else if fallback != "" {
+			addAuthorJoin()
+			like := "%" + strings.ToLower(fallback) + "%"
+			conditions = append(conditions, "(LOWER(b.title) LIKE ? OR LOWER(b.annotation) LIKE ? OR LOWER(a.name) LIKE ? OR LOWER(s.name) LIKE ?)")
+			baseArgs = append(baseArgs, like, like, like, like)
+		}
 	}
 
 	if len(filter.Authors) > 0 {
-		needsAuthorJoin = true
-		placeholders := strings.Repeat("?,", len(filter.Authors))
-		placeholders = placeholders[:len(placeholders)-1] // Remove last comma
+		addAuthorJoin()
+		placeholders := createPlaceholders(len(filter.Authors))
 		conditions = append(conditions, fmt.Sprintf("a.name IN (%s)", placeholders))
-	}
-
-	// Add author join if needed
-	if needsAuthorJoin {
-		query += " LEFT JOIN book_authors ba ON b.id = ba.book_id LEFT JOIN authors a ON ba.author_id = a.id"
+		for _, author := range filter.Authors {
+			baseArgs = append(baseArgs, author)
+		}
 	}
 
 	if len(filter.Series) > 0 {
-		placeholders := strings.Repeat("?,", len(filter.Series))
-		placeholders = placeholders[:len(placeholders)-1]
+		placeholders := createPlaceholders(len(filter.Series))
 		conditions = append(conditions, fmt.Sprintf("s.name IN (%s)", placeholders))
+		for _, series := range filter.Series {
+			baseArgs = append(baseArgs, series)
+		}
 	}
 
 	if len(filter.Genres) > 0 {
-		placeholders := strings.Repeat("?,", len(filter.Genres))
-		placeholders = placeholders[:len(placeholders)-1]
+		placeholders := createPlaceholders(len(filter.Genres))
 		conditions = append(conditions, fmt.Sprintf("g.name IN (%s)", placeholders))
+		for _, genre := range filter.Genres {
+			baseArgs = append(baseArgs, genre)
+		}
 	}
 
 	if len(filter.Languages) > 0 {
-		placeholders := strings.Repeat("?,", len(filter.Languages))
-		placeholders = placeholders[:len(placeholders)-1]
+		placeholders := createPlaceholders(len(filter.Languages))
 		conditions = append(conditions, fmt.Sprintf("b.language IN (%s)", placeholders))
+		for _, language := range filter.Languages {
+			baseArgs = append(baseArgs, language)
+		}
 	}
 
 	if len(filter.Formats) > 0 {
-		placeholders := strings.Repeat("?,", len(filter.Formats))
-		placeholders = placeholders[:len(placeholders)-1]
+		placeholders := createPlaceholders(len(filter.Formats))
 		conditions = append(conditions, fmt.Sprintf("b.format IN (%s)", placeholders))
+		for _, format := range filter.Formats {
+			baseArgs = append(baseArgs, format)
+		}
 	}
 
 	if filter.YearFrom > 0 {
 		conditions = append(conditions, "b.year >= ?")
+		baseArgs = append(baseArgs, filter.YearFrom)
 	}
 
 	if filter.YearTo > 0 {
 		conditions = append(conditions, "b.year <= ?")
+		baseArgs = append(baseArgs, filter.YearTo)
 	}
 
+	orderClause := buildOrderClause(filter.SortBy, filter.SortOrder, hasFTS)
+
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString("SELECT ")
+	queryBuilder.WriteString(bookSelectColumns)
+	queryBuilder.WriteString(" FROM books b")
+	for _, join := range joins {
+		queryBuilder.WriteString(" ")
+		queryBuilder.WriteString(join)
+	}
 	if len(conditions) > 0 {
-		query += " WHERE " + strings.Join(conditions, " AND ")
+		queryBuilder.WriteString(" WHERE ")
+		queryBuilder.WriteString(strings.Join(conditions, " AND "))
+	}
+	if joinedAuthors {
+		queryBuilder.WriteString(" GROUP BY b.id")
+	}
+	queryBuilder.WriteString(orderClause)
+	queryBuilder.WriteString(" LIMIT ? OFFSET ?")
+
+	queryArgs := make([]interface{}, 0, len(baseArgs)+2)
+	queryArgs = append(queryArgs, baseArgs...)
+	queryArgs = append(queryArgs, limit, offset)
+
+	var countBuilder strings.Builder
+	countBuilder.WriteString("SELECT COUNT(DISTINCT b.id) FROM books b")
+	for _, join := range joins {
+		countBuilder.WriteString(" ")
+		countBuilder.WriteString(join)
+	}
+	if len(conditions) > 0 {
+		countBuilder.WriteString(" WHERE ")
+		countBuilder.WriteString(strings.Join(conditions, " AND "))
 	}
 
-	// Group by book ID to avoid duplicates when joining with authors
-	if needsAuthorJoin {
-		query += " GROUP BY b.id"
-	}
+	countArgs := make([]interface{}, 0, len(baseArgs))
+	countArgs = append(countArgs, baseArgs...)
 
-	// Add sorting
-	switch filter.SortBy {
-	case "year":
-		query += " ORDER BY b.year"
-	case "date_added":
-		query += " ORDER BY b.date_added"
-	case "relevance":
-		query += " ORDER BY b.title" // Simple title sort for now
-	default:
-		query += " ORDER BY b.title"
-	}
-
-	if filter.SortOrder == "desc" {
-		query += " DESC"
-	} else {
-		query += " ASC"
-	}
-
-	query += " LIMIT ? OFFSET ?"
-
-	return query
+	return queryBuilder.String(), queryArgs, countBuilder.String(), countArgs
 }
 
-// buildSearchArgs builds the arguments for the search query
-func (r *Repository) buildSearchArgs(filter BookFilter) []interface{} {
-	var args []interface{}
-
-	if filter.Query != "" {
-		// Add wildcards for LIKE search (title, annotation, author)
-		searchQuery := "%" + filter.Query + "%"
-		args = append(args, searchQuery, searchQuery, searchQuery)
+func buildOrderClause(sortBy, sortOrder string, hasFTS bool) string {
+	if sortBy == "" && hasFTS {
+		sortBy = "relevance"
 	}
 
-	for _, author := range filter.Authors {
-		args = append(args, author)
+	var column string
+	switch sortBy {
+	case "year":
+		column = "b.year"
+	case "date_added":
+		column = "b.date_added"
+	case "relevance":
+		if hasFTS {
+			column = "bm25(books_fts)"
+		} else {
+			column = "b.title"
+		}
+	default:
+		column = "b.title"
 	}
 
-	for _, series := range filter.Series {
-		args = append(args, series)
+	direction := "ASC"
+	if strings.ToLower(sortOrder) == "desc" {
+		direction = "DESC"
 	}
 
-	for _, genre := range filter.Genres {
-		args = append(args, genre)
+	return " ORDER BY " + column + " " + direction
+}
+
+func createPlaceholders(count int) string {
+	if count <= 0 {
+		return ""
 	}
-
-	for _, lang := range filter.Languages {
-		args = append(args, lang)
-	}
-
-	for _, format := range filter.Formats {
-		args = append(args, format)
-	}
-
-	if filter.YearFrom > 0 {
-		args = append(args, filter.YearFrom)
-	}
-
-	if filter.YearTo > 0 {
-		args = append(args, filter.YearTo)
-	}
-
-	args = append(args, filter.Limit, filter.Offset)
-
-	return args
+	return strings.TrimRight(strings.Repeat("?,", count), ",")
 }
 
 // scanBook scans a book from database row
@@ -420,16 +466,13 @@ func (r *Repository) getBookAuthors(bookID string) ([]Author, error) {
 
 // GetBookByID gets a single book by ID
 func (r *Repository) GetBookByID(id string) (*Book, error) {
-	filter := BookFilter{
-		Limit:  1,
-		Offset: 0,
-	}
+	query := fmt.Sprintf(`SELECT %s FROM books b
+		LEFT JOIN series s ON b.series_id = s.id
+		LEFT JOIN genres g ON b.genre_id = g.id
+		WHERE b.id = ?
+		LIMIT 1`, bookSelectColumns)
 
-	// Add WHERE condition for specific book ID
-	query := r.buildSearchQuery(filter)
-	query = strings.Replace(query, "ORDER BY", "WHERE b.id = ? ORDER BY", 1)
-
-	row := r.db.db.QueryRow(query, id, 1, 0)
+	row := r.db.db.QueryRow(query, id)
 
 	book, err := r.scanBookRow(row)
 	if err != nil {
@@ -513,6 +556,11 @@ func (r *Repository) ClearAllBooks() error {
 	}
 
 	_, err = tx.Exec("DELETE FROM genres")
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("DELETE FROM books_fts")
 	if err != nil {
 		return err
 	}
