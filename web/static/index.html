@@ -7,6 +7,64 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <style>
+        :root {
+            --background-color: #f5f5f5;
+            --surface-color: #ffffff;
+            --surface-border: #e1e5e9;
+            --text-color: #1f2937;
+            --muted-text: #6b7280;
+            --secondary-text: #4b5563;
+            --primary-color: #2563eb;
+            --primary-color-hover: #1d4ed8;
+            --secondary-bg: #f3f4f6;
+            --secondary-bg-hover: #e5e7eb;
+            --button-primary-text: #ffffff;
+            --button-secondary-text: #374151;
+            --meta-tag-bg: #f3f4f6;
+            --highlight-bg: #fef3c7;
+            --spinner-track: #e1e5e9;
+            --spinner-head: #2563eb;
+            --modal-overlay: rgba(0, 0, 0, 0.5);
+            --modal-surface: #ffffff;
+            --modal-border: #e1e5e9;
+            --series-pill-bg: #dbeafe;
+            --series-pill-text: #1e40af;
+            --input-background: #ffffff;
+            --input-border: #e1e5e9;
+            --input-text: #1f2937;
+            --input-placeholder: #6b7280;
+            --border-subtle: #e1e5e9;
+        }
+
+        [data-theme="dark"] {
+            --background-color: #0f172a;
+            --surface-color: #1e293b;
+            --surface-border: #2a3a54;
+            --text-color: #f1f5f9;
+            --muted-text: #94a3b8;
+            --secondary-text: #cbd5f5;
+            --primary-color: #60a5fa;
+            --primary-color-hover: #3b82f6;
+            --secondary-bg: #1f2937;
+            --secondary-bg-hover: #334155;
+            --button-primary-text: #0f172a;
+            --button-secondary-text: #e2e8f0;
+            --meta-tag-bg: #334155;
+            --highlight-bg: rgba(250, 204, 21, 0.25);
+            --spinner-track: #334155;
+            --spinner-head: #60a5fa;
+            --modal-overlay: rgba(15, 23, 42, 0.75);
+            --modal-surface: #1f2937;
+            --modal-border: #334155;
+            --series-pill-bg: #1e3a8a;
+            --series-pill-text: #bfdbfe;
+            --input-background: #1f2937;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
+            --input-placeholder: #94a3b8;
+            --border-subtle: #334155;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -15,8 +73,9 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .container {
@@ -27,8 +86,8 @@
 
         /* Header */
         .header {
-            background: white;
-            border-bottom: 1px solid #e1e5e9;
+            background: var(--surface-color);
+            border-bottom: 1px solid var(--border-subtle);
             padding: 1rem 0;
             position: sticky;
             top: 0;
@@ -38,13 +97,14 @@
         .header-content {
             display: flex;
             align-items: center;
-            gap: 2rem;
+            gap: 1.5rem;
+            justify-content: space-between;
         }
 
         .logo {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #2563eb;
+            color: var(--primary-color);
         }
 
         .search-box {
@@ -55,15 +115,33 @@
         .search-input {
             width: 100%;
             padding: 0.75rem 1rem;
-            border: 2px solid #e1e5e9;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
             font-size: 1rem;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
+            background-color: var(--input-background);
+            color: var(--input-text);
         }
 
         .search-input:focus {
             outline: none;
-            border-color: #2563eb;
+            border-color: var(--primary-color);
+        }
+
+        .search-input::placeholder {
+            color: var(--input-placeholder);
+        }
+
+        .theme-toggle {
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
         }
 
         /* Main content */
@@ -73,27 +151,27 @@
 
         /* Stats */
         .stats {
-            background: white;
+            background: var(--surface-color);
             padding: 1rem;
             border-radius: 8px;
             margin-bottom: 2rem;
             text-align: center;
-            border: 1px solid #e1e5e9;
+            border: 1px solid var(--surface-border);
         }
 
         /* Loading */
         .loading {
             text-align: center;
             padding: 3rem;
-            color: #6b7280;
+            color: var(--muted-text);
         }
 
         .spinner {
             display: inline-block;
             width: 32px;
             height: 32px;
-            border: 3px solid #e1e5e9;
-            border-top: 3px solid #2563eb;
+            border: 3px solid var(--spinner-track);
+            border-top: 3px solid var(--spinner-head);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 1rem;
@@ -120,28 +198,28 @@
         }
 
         .book-card {
-            background: white;
+            background: var(--surface-color);
             border-radius: 8px;
             padding: 1.5rem;
-            border: 1px solid #e1e5e9;
+            border: 1px solid var(--surface-border);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .book-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
         }
 
         .book-title {
             font-size: 1.125rem;
             font-weight: 600;
             margin-bottom: 0.5rem;
-            color: #1f2937;
+            color: var(--text-color);
             line-height: 1.4;
         }
 
         .book-authors {
-            color: #6b7280;
+            color: var(--muted-text);
             margin-bottom: 0.75rem;
             font-size: 0.875rem;
         }
@@ -154,15 +232,15 @@
         }
 
         .meta-tag {
-            background: #f3f4f6;
+            background: var(--meta-tag-bg);
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             font-size: 0.75rem;
-            color: #6b7280;
+            color: var(--muted-text);
         }
 
         .book-annotation {
-            color: #4b5563;
+            color: var(--secondary-text);
             font-size: 0.875rem;
             line-height: 1.5;
             margin-bottom: 1rem;
@@ -187,21 +265,21 @@
         }
 
         .btn-primary {
-            background: #2563eb;
-            color: white;
+            background: var(--primary-color);
+            color: var(--button-primary-text);
         }
 
         .btn-primary:hover {
-            background: #1d4ed8;
+            background: var(--primary-color-hover);
         }
 
         .btn-secondary {
-            background: #f3f4f6;
-            color: #6b7280;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
         }
 
         .btn-secondary:hover {
-            background: #e5e7eb;
+            background: var(--secondary-bg-hover);
         }
 
         /* Pagination */
@@ -214,7 +292,7 @@
         }
 
         .page-info {
-            color: #6b7280;
+            color: var(--muted-text);
             font-size: 0.875rem;
         }
 
@@ -222,7 +300,7 @@
         .empty-state {
             text-align: center;
             padding: 3rem;
-            color: #6b7280;
+            color: var(--muted-text);
         }
 
         .empty-icon {
@@ -241,6 +319,16 @@
                 max-width: none;
             }
 
+            .theme-toggle {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .theme-toggle-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
             .books-columns {
                 flex-direction: column;
             }
@@ -252,7 +340,7 @@
 
         /* Highlight search terms */
         .highlight {
-            background-color: #fef3c7;
+            background-color: var(--highlight-bg);
             padding: 0 2px;
             border-radius: 2px;
         }
@@ -264,7 +352,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: var(--modal-overlay);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -273,23 +361,24 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--modal-surface);
             border-radius: 12px;
             max-width: 600px;
             max-height: 90vh;
             width: 90%;
             overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.3);
             animation: slideIn 0.3s ease-out;
+            border: 1px solid var(--modal-border);
         }
 
         .modal-header {
             display: flex;
             align-items: center;
-            justify-content: between;
+            justify-content: space-between;
             padding: 1.5rem;
-            border-bottom: 1px solid #e1e5e9;
-            background: #f8f9fa;
+            border-bottom: 1px solid var(--modal-border);
+            background: var(--secondary-bg);
         }
 
         .modal-title {
@@ -297,7 +386,7 @@
             margin: 0;
             font-size: 1.25rem;
             font-weight: 600;
-            color: #1f2937;
+            color: var(--text-color);
             line-height: 1.4;
         }
 
@@ -308,20 +397,21 @@
             cursor: pointer;
             padding: 0.25rem;
             margin-left: 1rem;
-            color: #6b7280;
+            color: var(--muted-text);
             border-radius: 4px;
             transition: background-color 0.2s;
         }
 
         .modal-close:hover {
-            background: rgba(0, 0, 0, 0.1);
-            color: #374151;
+            background: var(--secondary-bg-hover);
+            color: var(--text-color);
         }
 
         .modal-body {
             padding: 1.5rem;
             max-height: 60vh;
             overflow-y: auto;
+            color: var(--secondary-text);
         }
 
         .book-details {
@@ -337,20 +427,20 @@
 
         .detail-label {
             font-weight: 600;
-            color: #374151;
+            color: var(--muted-text);
             min-width: 120px;
             flex-shrink: 0;
         }
 
         .detail-value {
-            color: #4b5563;
+            color: var(--secondary-text);
             flex: 1;
             line-height: 1.5;
         }
 
         .series-number {
-            background: #dbeafe;
-            color: #1e40af;
+            background: var(--series-pill-bg);
+            color: var(--series-pill-text);
             padding: 0.125rem 0.375rem;
             border-radius: 12px;
             font-size: 0.75rem;
@@ -359,7 +449,7 @@
         }
 
         .file-size {
-            color: #6b7280;
+            color: var(--muted-text);
             font-size: 0.875rem;
         }
 
@@ -374,8 +464,8 @@
             justify-content: flex-end;
             gap: 0.75rem;
             padding: 1.5rem;
-            border-top: 1px solid #e1e5e9;
-            background: #f8f9fa;
+            border-top: 1px solid var(--modal-border);
+            background: var(--secondary-bg);
         }
 
         @keyframes fadeIn {
@@ -436,6 +526,11 @@
                             v-model="searchQuery"
                             @input="onSearchInput"
                         >
+                    </div>
+                    <div class="theme-toggle">
+                        <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
+                            {{ themeToggleLabel }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -637,7 +732,11 @@
                     totalBooks: 0,
                     debounceTimer: null,
                     apiBase: window.location.origin + '/api/v1',
-                    selectedBook: null
+                    selectedBook: null,
+                    theme: 'light',
+                    themeMediaQuery: null,
+                    systemThemeListener: null,
+                    escapeKeyHandler: null
                 };
             },
             computed: {
@@ -667,6 +766,9 @@
                     }
 
                     return groups;
+                },
+                themeToggleLabel() {
+                    return this.theme === 'dark' ? '🌞 Светлая тема' : '🌙 Тёмная тема';
                 }
             },
             methods: {
@@ -767,18 +869,99 @@
                         month: 'long',
                         day: 'numeric'
                     });
+                },
+
+                toggleTheme() {
+                    const nextTheme = this.theme === 'dark' ? 'light' : 'dark';
+                    this.applyTheme(nextTheme, true);
+                },
+
+                applyTheme(theme, persist = true) {
+                    this.theme = theme;
+                    if (typeof document !== 'undefined') {
+                        document.documentElement.setAttribute('data-theme', theme);
+                    }
+
+                    if (persist) {
+                        try {
+                            localStorage.setItem('pushkinlib-theme', theme);
+                        } catch (error) {
+                            // ignore storage errors
+                        }
+                    } else {
+                        try {
+                            localStorage.removeItem('pushkinlib-theme');
+                        } catch (error) {
+                            // ignore storage errors
+                        }
+                    }
+                },
+
+                determineInitialTheme(storedTheme) {
+                    if (storedTheme === 'light' || storedTheme === 'dark') {
+                        return storedTheme;
+                    }
+
+                    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        return 'dark';
+                    }
+
+                    return 'light';
+                },
+
+                handleSystemThemeChange(event) {
+                    if (this.getStoredTheme()) {
+                        return;
+                    }
+
+                    const theme = event.matches ? 'dark' : 'light';
+                    this.applyTheme(theme, false);
+                },
+
+                getStoredTheme() {
+                    try {
+                        return localStorage.getItem('pushkinlib-theme');
+                    } catch (error) {
+                        return null;
+                    }
                 }
             },
 
             mounted() {
                 this.loadBooks();
 
-                // Handle Escape key to close modal
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape' && this.selectedBook) {
-                        this.closeModal();
-                    }
-                });
+                if (typeof document !== 'undefined') {
+                    const escapeHandler = (event) => {
+                        if (event.key === 'Escape' && this.selectedBook) {
+                            this.closeModal();
+                        }
+                    };
+                    document.addEventListener('keydown', escapeHandler);
+                    this.escapeKeyHandler = escapeHandler;
+                }
+
+                const storedTheme = this.getStoredTheme();
+                const initialTheme = this.determineInitialTheme(storedTheme);
+                const shouldPersist = storedTheme === 'light' || storedTheme === 'dark';
+                this.applyTheme(initialTheme, shouldPersist);
+
+                if (!shouldPersist && typeof window !== 'undefined' && window.matchMedia) {
+                    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                    this.themeMediaQuery = mediaQuery;
+                    const handler = (event) => this.handleSystemThemeChange(event);
+                    this.systemThemeListener = handler;
+                    mediaQuery.addEventListener('change', handler);
+                }
+            },
+
+            beforeUnmount() {
+                if (this.themeMediaQuery && this.systemThemeListener) {
+                    this.themeMediaQuery.removeEventListener('change', this.systemThemeListener);
+                }
+
+                if (this.escapeKeyHandler) {
+                    document.removeEventListener('keydown', this.escapeKeyHandler);
+                }
             }
         }).mount('#app');
     </script>
