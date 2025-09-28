@@ -52,7 +52,12 @@ func main() {
 		if result.Collection != nil && result.Collection.Name != "" {
 			collectionName = result.Collection.Name
 		}
-		fmt.Printf("Imported %d books from %s in %s\n", result.Imported, collectionName, result.Duration.Truncate(time.Millisecond))
+		total := result.Duration.Truncate(time.Millisecond)
+		parse := result.ParseDuration.Truncate(time.Millisecond)
+		clear := result.ClearDuration.Truncate(time.Millisecond)
+		insert := result.InsertDuration.Truncate(time.Millisecond)
+		fmt.Printf("Imported %d books from %s in %s\n", result.Imported, collectionName, total)
+		fmt.Printf("  parse=%s clear=%s insert=%s\n", parse, clear, insert)
 	} else {
 		fmt.Printf("Database contains %d books\n", searchResult.Total)
 	}

@@ -2,16 +2,21 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/piligrim/pushkinlib/internal/inpx"
 )
 
 // Repository handles database operations for books
 type Repository struct {
-	db *Database
+	db       *Database
+	ftsFresh atomic.Bool
 }
 
 const bookSelectColumns = `
@@ -183,84 +188,262 @@ func (r *Repository) GetGenreByID(genreID int) (*Genre, error) {
 
 // InsertBooks inserts multiple books from INPX parsing
 func (r *Repository) InsertBooks(books []inpx.Book) error {
+	if len(books) == 0 {
+		return nil
+	}
+
+	var snapshot pragmaSnapshot
+	if snap, err := r.captureBulkImportPragmaSnapshot(); err != nil {
+		log.Printf("InsertBooks: failed to capture PRAGMA snapshot: %v", err)
+	} else {
+		snapshot = *snap
+
+		if err := r.setPragmaInt("synchronous", 0); err != nil {
+			log.Printf("InsertBooks: PRAGMA synchronous optimization skipped: %v", err)
+		} else {
+			defer func(value int) {
+				if restoreErr := r.setPragmaInt("synchronous", value); restoreErr != nil {
+					log.Printf("InsertBooks: failed to restore PRAGMA synchronous: %v", restoreErr)
+				}
+			}(snapshot.synchronous)
+		}
+
+		if err := r.setPragmaInt("temp_store", 2); err != nil {
+			log.Printf("InsertBooks: PRAGMA temp_store optimization skipped: %v", err)
+		} else {
+			defer func(value int) {
+				if restoreErr := r.setPragmaInt("temp_store", value); restoreErr != nil {
+					log.Printf("InsertBooks: failed to restore PRAGMA temp_store: %v", restoreErr)
+				}
+			}(snapshot.tempStore)
+		}
+
+		if err := r.setPragmaInt("cache_size", -200000); err != nil {
+			log.Printf("InsertBooks: PRAGMA cache_size optimization skipped: %v", err)
+		} else {
+			defer func(value int) {
+				if restoreErr := r.setPragmaInt("cache_size", value); restoreErr != nil {
+					log.Printf("InsertBooks: failed to restore PRAGMA cache_size: %v", restoreErr)
+				}
+			}(snapshot.cacheSize)
+		}
+
+		if snapshot.journalMode != "" {
+			if newMode, err := r.setPragmaJournalMode("MEMORY"); err != nil {
+				log.Printf("InsertBooks: PRAGMA journal_mode optimization skipped: %v", err)
+			} else if !strings.EqualFold(newMode, "MEMORY") {
+				log.Printf("InsertBooks: journal_mode remained %s, expected MEMORY", newMode)
+			} else {
+				defer func(mode string) {
+					if _, restoreErr := r.setPragmaJournalMode(mode); restoreErr != nil {
+						log.Printf("InsertBooks: failed to restore PRAGMA journal_mode=%s: %v", mode, restoreErr)
+					}
+				}(snapshot.journalMode)
+			}
+		}
+	}
+
 	tx, err := r.db.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	for _, book := range books {
-		if err := r.insertBookTx(tx, book); err != nil {
+	skipFTSDelete := r.ftsFresh.Swap(false)
+
+	bookStmt, err := tx.Prepare(`
+		INSERT OR REPLACE INTO books
+		(id, title, series_id, series_num, genre_id, year, language,
+		 file_size, archive_path, file_num, format, date_added, rating, annotation, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare book insert statement: %w", err)
+	}
+	defer bookStmt.Close()
+
+	bookAuthorStmt, err := tx.Prepare(`
+		INSERT OR IGNORE INTO book_authors (book_id, author_id)
+		VALUES (?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare book author statement: %w", err)
+	}
+	defer bookAuthorStmt.Close()
+
+	var ftsDeleteStmt *sql.Stmt
+	if !skipFTSDelete {
+		ftsDeleteStmt, err = tx.Prepare("DELETE FROM books_fts WHERE book_id = ?")
+		if err != nil {
+			return fmt.Errorf("failed to prepare books_fts delete statement: %w", err)
+		}
+		defer ftsDeleteStmt.Close()
+	}
+
+	ftsInsertStmt, err := tx.Prepare(`
+		INSERT INTO books_fts (book_id, title, annotation, authors, series)
+		VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare books_fts insert statement: %w", err)
+	}
+	defer ftsInsertStmt.Close()
+
+	authorCache := make(map[string]int, 1024)
+	seriesCache := make(map[string]int, 256)
+	genreCache := make(map[string]int, 128)
+
+	for i, book := range books {
+		if err := r.insertBookTx(tx, book, bookStmt, bookAuthorStmt, ftsDeleteStmt, ftsInsertStmt, authorCache, seriesCache, genreCache, skipFTSDelete); err != nil {
 			return fmt.Errorf("failed to insert book %s: %w", book.ID, err)
+		}
+
+		if (i+1)%50000 == 0 || i+1 == len(books) {
+			log.Printf("Reindex: inserted %d/%d books", i+1, len(books))
 		}
 	}
 
 	return tx.Commit()
 }
 
-// insertBookTx inserts a single book within a transaction
-func (r *Repository) insertBookTx(tx *sql.Tx, book inpx.Book) error {
-	// Insert or get series
-	var seriesID *int
-	if book.Series != "" {
-		id, err := r.getOrCreateSeriesTx(tx, book.Series)
-		if err != nil {
-			return err
-		}
-		seriesID = &id
-	}
+type pragmaSnapshot struct {
+	synchronous int
+	tempStore   int
+	cacheSize   int
+	journalMode string
+}
 
-	// Insert or get genre
-	var genreID *int
-	if book.Genre != "" {
-		id, err := r.getOrCreateGenreTx(tx, book.Genre)
-		if err != nil {
-			return err
-		}
-		genreID = &id
-	}
-
-	// Insert book
-	_, err := tx.Exec(`
-		INSERT OR REPLACE INTO books
-		(id, title, series_id, series_num, genre_id, year, language,
-		 file_size, archive_path, file_num, format, date_added, rating, annotation, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		book.ID, book.Title, seriesID, book.SeriesNum, genreID, book.Year,
-		book.Language, book.FileSize, book.ArchivePath, book.FileNum,
-		book.Format, book.Date, book.Rating, book.Annotation, time.Now())
+func (r *Repository) captureBulkImportPragmaSnapshot() (*pragmaSnapshot, error) {
+	synchronous, err := r.pragmaInt("synchronous")
 	if err != nil {
+		return nil, err
+	}
+
+	tempStore, err := r.pragmaInt("temp_store")
+	if err != nil {
+		return nil, err
+	}
+
+	cacheSize, err := r.pragmaInt("cache_size")
+	if err != nil {
+		return nil, err
+	}
+
+	journalMode, err := r.pragmaString("journal_mode")
+	if err != nil {
+		return nil, err
+	}
+
+	return &pragmaSnapshot{
+		synchronous: synchronous,
+		tempStore:   tempStore,
+		cacheSize:   cacheSize,
+		journalMode: journalMode,
+	}, nil
+}
+
+func (r *Repository) pragmaInt(name string) (int, error) {
+	var value int
+	query := fmt.Sprintf("PRAGMA %s", name)
+	if err := r.db.db.QueryRow(query).Scan(&value); err != nil {
+		return 0, fmt.Errorf("failed to read PRAGMA %s: %w", name, err)
+	}
+	return value, nil
+}
+
+func (r *Repository) setPragmaInt(name string, value int) error {
+	query := fmt.Sprintf("PRAGMA %s = %d", name, value)
+	if _, err := r.db.db.Exec(query); err != nil {
+		return fmt.Errorf("failed to set PRAGMA %s: %w", name, err)
+	}
+	return nil
+}
+
+func (r *Repository) pragmaString(name string) (string, error) {
+	var value string
+	query := fmt.Sprintf("PRAGMA %s", name)
+	if err := r.db.db.QueryRow(query).Scan(&value); err != nil {
+		return "", fmt.Errorf("failed to read PRAGMA %s: %w", name, err)
+	}
+	return value, nil
+}
+
+func (r *Repository) setPragmaJournalMode(mode string) (string, error) {
+	normalized := strings.ToUpper(mode)
+	query := fmt.Sprintf("PRAGMA journal_mode = %s", normalized)
+	var result string
+	if err := r.db.db.QueryRow(query).Scan(&result); err != nil {
+		return "", fmt.Errorf("failed to set PRAGMA journal_mode=%s: %w", normalized, err)
+	}
+	return strings.ToUpper(result), nil
+}
+
+// insertBookTx inserts a single book within a transaction
+func (r *Repository) insertBookTx(
+	tx *sql.Tx,
+	book inpx.Book,
+	bookStmt, bookAuthorStmt, ftsDeleteStmt, ftsInsertStmt *sql.Stmt,
+	authorCache, seriesCache, genreCache map[string]int,
+	skipFTSDelete bool,
+) error {
+	var seriesID sql.NullInt64
+	if book.Series != "" {
+		id, err := r.getOrCreateSeriesTx(tx, book.Series, seriesCache)
+		if err != nil {
+			return err
+		}
+		seriesID = sql.NullInt64{Int64: int64(id), Valid: true}
+	}
+
+	var genreID sql.NullInt64
+	if book.Genre != "" {
+		id, err := r.getOrCreateGenreTx(tx, book.Genre, genreCache)
+		if err != nil {
+			return err
+		}
+		genreID = sql.NullInt64{Int64: int64(id), Valid: true}
+	}
+
+	if _, err := bookStmt.Exec(
+		book.ID,
+		book.Title,
+		seriesID,
+		book.SeriesNum,
+		genreID,
+		book.Year,
+		book.Language,
+		book.FileSize,
+		book.ArchivePath,
+		book.FileNum,
+		book.Format,
+		book.Date,
+		book.Rating,
+		book.Annotation,
+		time.Now(),
+	); err != nil {
 		return err
 	}
 
-	// Insert book authors
 	for _, authorName := range book.Authors {
 		if authorName == "" {
 			continue
 		}
-		authorID, err := r.getOrCreateAuthorTx(tx, authorName)
+
+		authorID, err := r.getOrCreateAuthorTx(tx, authorName, authorCache)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec(`
-			INSERT OR IGNORE INTO book_authors (book_id, author_id)
-			VALUES (?, ?)`, book.ID, authorID)
-		if err != nil {
+		if _, err := bookAuthorStmt.Exec(book.ID, authorID); err != nil {
 			return err
 		}
 	}
 
-	// Update full-text search index
-	if _, err := tx.Exec("DELETE FROM books_fts WHERE book_id = ?", book.ID); err != nil {
-		return err
+	if !skipFTSDelete && ftsDeleteStmt != nil {
+		if _, err := ftsDeleteStmt.Exec(book.ID); err != nil {
+			return err
+		}
 	}
 
 	authorsText := strings.Join(book.Authors, " ")
-	if _, err := tx.Exec(
-		"INSERT INTO books_fts (book_id, title, annotation, authors, series) VALUES (?, ?, ?, ?, ?)",
-		book.ID, book.Title, book.Annotation, authorsText, book.Series,
-	); err != nil {
+	if _, err := ftsInsertStmt.Exec(book.ID, book.Title, book.Annotation, authorsText, book.Series); err != nil {
 		return err
 	}
 
@@ -268,75 +451,128 @@ func (r *Repository) insertBookTx(tx *sql.Tx, book inpx.Book) error {
 }
 
 // getOrCreateAuthorTx gets or creates an author and returns its ID
-func (r *Repository) getOrCreateAuthorTx(tx *sql.Tx, name string) (int, error) {
-	var id int
-	err := tx.QueryRow("SELECT id FROM authors WHERE name = ?", name).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, err
+func (r *Repository) getOrCreateAuthorTx(tx *sql.Tx, name string, cache map[string]int) (int, error) {
+	if cache != nil {
+		if id, ok := cache[name]; ok {
+			return id, nil
+		}
 	}
 
 	result, err := tx.Exec("INSERT INTO authors (name) VALUES (?)", name)
-	if err != nil {
+	if err == nil {
+		lastID, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+
+		id := int(lastID)
+		if cache != nil {
+			cache[name] = id
+		}
+		return id, nil
+	}
+
+	if !isUniqueConstraintError(err) {
 		return 0, err
 	}
 
-	lastID, err := result.LastInsertId()
-	if err != nil {
+	var id int
+	if err := tx.QueryRow("SELECT id FROM authors WHERE name = ?", name).Scan(&id); err != nil {
 		return 0, err
 	}
 
-	return int(lastID), nil
+	if cache != nil {
+		cache[name] = id
+	}
+	return id, nil
 }
 
 // getOrCreateSeriesTx gets or creates a series and returns its ID
-func (r *Repository) getOrCreateSeriesTx(tx *sql.Tx, name string) (int, error) {
-	var id int
-	err := tx.QueryRow("SELECT id FROM series WHERE name = ?", name).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, err
+func (r *Repository) getOrCreateSeriesTx(tx *sql.Tx, name string, cache map[string]int) (int, error) {
+	if cache != nil {
+		if id, ok := cache[name]; ok {
+			return id, nil
+		}
 	}
 
 	result, err := tx.Exec("INSERT INTO series (name) VALUES (?)", name)
-	if err != nil {
+	if err == nil {
+		lastID, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+
+		id := int(lastID)
+		if cache != nil {
+			cache[name] = id
+		}
+		return id, nil
+	}
+
+	if !isUniqueConstraintError(err) {
 		return 0, err
 	}
 
-	lastID, err := result.LastInsertId()
-	if err != nil {
+	var id int
+	if err := tx.QueryRow("SELECT id FROM series WHERE name = ?", name).Scan(&id); err != nil {
 		return 0, err
 	}
 
-	return int(lastID), nil
+	if cache != nil {
+		cache[name] = id
+	}
+	return id, nil
 }
 
 // getOrCreateGenreTx gets or creates a genre and returns its ID
-func (r *Repository) getOrCreateGenreTx(tx *sql.Tx, name string) (int, error) {
-	var id int
-	err := tx.QueryRow("SELECT id FROM genres WHERE name = ?", name).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, err
+func (r *Repository) getOrCreateGenreTx(tx *sql.Tx, name string, cache map[string]int) (int, error) {
+	if cache != nil {
+		if id, ok := cache[name]; ok {
+			return id, nil
+		}
 	}
 
 	result, err := tx.Exec("INSERT INTO genres (name) VALUES (?)", name)
-	if err != nil {
+	if err == nil {
+		lastID, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+
+		id := int(lastID)
+		if cache != nil {
+			cache[name] = id
+		}
+		return id, nil
+	}
+
+	if !isUniqueConstraintError(err) {
 		return 0, err
 	}
 
-	lastID, err := result.LastInsertId()
-	if err != nil {
+	var id int
+	if err := tx.QueryRow("SELECT id FROM genres WHERE name = ?", name).Scan(&id); err != nil {
 		return 0, err
 	}
 
-	return int(lastID), nil
+	if cache != nil {
+		cache[name] = id
+	}
+	return id, nil
+}
+
+func isUniqueConstraintError(err error) bool {
+	var sqliteErr sqlite3.Error
+	if errors.As(err, &sqliteErr) {
+		if sqliteErr.Code == sqlite3.ErrConstraint {
+			return true
+		}
+		switch sqliteErr.ExtendedCode {
+		case sqlite3.ErrConstraintUnique, sqlite3.ErrConstraintPrimaryKey:
+			return true
+		}
+	}
+	return false
 }
 
 // SearchBooks searches books with filters
@@ -721,5 +957,10 @@ func (r *Repository) ClearAllBooks() error {
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	r.ftsFresh.Store(true)
+	return nil
 }

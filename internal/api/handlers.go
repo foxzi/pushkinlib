@@ -55,11 +55,14 @@ func (h *Handlers) ReindexLibrary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"status":      "ok",
-		"imported":    result.Imported,
-		"collection":  collectionName,
-		"version":     collectionVersion,
-		"duration_ms": result.Duration.Milliseconds(),
+		"status":             "ok",
+		"imported":           result.Imported,
+		"collection":         collectionName,
+		"version":            collectionVersion,
+		"duration_ms":        result.Duration.Milliseconds(),
+		"parse_duration_ms":  result.ParseDuration.Milliseconds(),
+		"clear_duration_ms":  result.ClearDuration.Milliseconds(),
+		"insert_duration_ms": result.InsertDuration.Milliseconds(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
