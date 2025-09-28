@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ func (p *Parser) parseINPFile(file *zip.File) ([]Book, error) {
 
 	var books []Book
 	scanner := bufio.NewScanner(rc)
+	defaultArchive := strings.TrimSuffix(path.Base(file.Name), ".inp")
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -71,6 +73,11 @@ func (p *Parser) parseINPFile(file *zip.File) ([]Book, error) {
 			// Log error but continue parsing other lines
 			continue
 		}
+
+		if book.ArchivePath == "" || book.ArchivePath == book.ID {
+			book.ArchivePath = defaultArchive
+		}
+		book.FileNum = book.ID
 
 		books = append(books, book)
 	}

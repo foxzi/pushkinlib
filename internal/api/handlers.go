@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/piligrim/pushkinlib/internal/indexer"
@@ -140,27 +142,42 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Book ID is required", http.StatusBadRequest)
 		return
 	}
+	log.Printf("Download: request book_id=%s", bookID)
 
 	// Get book info from database
 	book, err := h.repo.GetBookByID(bookID)
 	if err != nil {
+		log.Printf("Download: book_id=%s database error: %v", bookID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if book == nil {
+		log.Printf("Download: book_id=%s not found in database", bookID)
 		http.Error(w, "Book not found", http.StatusNotFound)
 		return
 	}
 
-	// Build path to archive
-	archivePath := filepath.Join(h.booksDir, book.ArchivePath+".zip")
+	// Build path to archive (INPX may store archive with or without .zip extension)
+	archiveName := book.ArchivePath
+	if archiveName == "" {
+		log.Printf("Download: book_id=%s has empty archive path", book.ID)
+		http.Error(w, "Book archive path is empty", http.StatusInternalServerError)
+		return
+	}
+	if !strings.HasSuffix(strings.ToLower(archiveName), ".zip") {
+		archiveName += ".zip"
+	}
+	archivePath := filepath.Join(h.booksDir, archiveName)
+	log.Printf("Download: book_id=%s resolved archive path %s", book.ID, archivePath)
 
 	// Check if archive exists
 	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+		log.Printf("Download: book_id=%s archive missing: %s", book.ID, archivePath)
 		http.Error(w, "Book archive not found", http.StatusNotFound)
 		return
 	}
+	log.Printf("Download: book_id=%s archive=%s (expected file %s.%s)", book.ID, archivePath, book.FileNum, book.Format)
 
 	// Open archive
 	archive, err := zip.OpenReader(archivePath)
@@ -170,18 +187,22 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 	}
 	defer archive.Close()
 
-	// Find book file in archive
-	var bookFile *zip.File
-	expectedFileName := book.FileNum + "." + book.Format
+	format := strings.ToLower(book.Format)
+	if format == "" {
+		format = "fb2"
+	}
+	expectedFileName := book.ID + "." + format
 
+	var bookFile *zip.File
 	for _, file := range archive.File {
-		if file.Name == expectedFileName {
+		if strings.EqualFold(file.Name, expectedFileName) {
 			bookFile = file
 			break
 		}
 	}
 
 	if bookFile == nil {
+		log.Printf("Download: book_id=%s not found inside archive %s (expected %s)", book.ID, archivePath, expectedFileName)
 		http.Error(w, "Book file not found in archive", http.StatusNotFound)
 		return
 	}
@@ -195,7 +216,8 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 	defer rc.Close()
 
 	// Set headers for download
-	filename := fmt.Sprintf("%s.%s", sanitizeFilename(book.Title), book.Format)
+	filename := fmt.Sprintf("%s.%s", sanitizeFilename(book.Title), format)
+	log.Printf("Download: serving book_id=%s as %s (archive entry %s) from archive %s", book.ID, filename, bookFile.Name, archivePath)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	w.Header().Set("Content-Type", getContentType(book.Format))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", bookFile.UncompressedSize64))
