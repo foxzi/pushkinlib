@@ -12,15 +12,17 @@ import (
 
 // Builder creates OPDS feeds
 type Builder struct {
-	baseURL     string
+	baseURL      string
 	catalogTitle string
+	genreNames   map[string]string
 }
 
 // NewBuilder creates a new OPDS builder
-func NewBuilder(baseURL, catalogTitle string) *Builder {
+func NewBuilder(baseURL, catalogTitle string, genreNames map[string]string) *Builder {
 	return &Builder{
-		baseURL:     strings.TrimSuffix(baseURL, "/"),
+		baseURL:      strings.TrimSuffix(baseURL, "/"),
 		catalogTitle: catalogTitle,
+		genreNames:   genreNames,
 	}
 }
 
@@ -120,6 +122,151 @@ func (b *Builder) BuildRootFeed() *Feed {
 	return feed
 }
 
+// BuildAuthorsFeed creates a navigation feed listing authors
+func (b *Builder) BuildAuthorsFeed(authors []storage.Author, page, totalAuthors, pageSize int) *Feed {
+	feed, _, _, now := b.newNavigationFeed("Авторы", "/opds/authors", page, totalAuthors, pageSize)
+
+	for _, author := range authors {
+		authorURL := fmt.Sprintf("%s/opds/authors/%d", b.baseURL, author.ID)
+		feed.Entries = append(feed.Entries, Entry{
+			ID:      authorURL,
+			Title:   author.Name,
+			Updated: now,
+			Summary: "Книги автора",
+			Links: []Link{
+				{
+					Rel:   RelSubsection,
+					Type:  TypeNavigation,
+					Href:  authorURL,
+					Title: fmt.Sprintf("Книги автора %s", author.Name),
+				},
+			},
+		})
+	}
+
+	return feed
+}
+
+// BuildSeriesFeed creates a navigation feed listing series
+func (b *Builder) BuildSeriesFeed(series []storage.Series, page, totalSeries, pageSize int) *Feed {
+	feed, _, _, now := b.newNavigationFeed("Серии", "/opds/series", page, totalSeries, pageSize)
+
+	for _, item := range series {
+		seriesURL := fmt.Sprintf("%s/opds/series/%d", b.baseURL, item.ID)
+		feed.Entries = append(feed.Entries, Entry{
+			ID:      seriesURL,
+			Title:   item.Name,
+			Updated: now,
+			Summary: "Книги серии",
+			Links: []Link{
+				{
+					Rel:   RelSubsection,
+					Type:  TypeNavigation,
+					Href:  seriesURL,
+					Title: fmt.Sprintf("Книги серии %s", item.Name),
+				},
+			},
+		})
+	}
+
+	return feed
+}
+
+// BuildGenresFeed creates a navigation feed listing genres
+func (b *Builder) BuildGenresFeed(genres []storage.Genre, page, totalGenres, pageSize int) *Feed {
+	feed, _, _, now := b.newNavigationFeed("Жанры", "/opds/genres", page, totalGenres, pageSize)
+
+	for _, item := range genres {
+		genreURL := fmt.Sprintf("%s/opds/genres/%d", b.baseURL, item.ID)
+		label := b.genreLabel(item.Name)
+		feed.Entries = append(feed.Entries, Entry{
+			ID:      genreURL,
+			Title:   label,
+			Updated: now,
+			Summary: fmt.Sprintf("Книги жанра %s", label),
+			Links: []Link{
+				{
+					Rel:   RelSubsection,
+					Type:  TypeNavigation,
+					Href:  genreURL,
+					Title: fmt.Sprintf("Книги жанра %s", label),
+				},
+			},
+		})
+	}
+
+	return feed
+}
+
+func (b *Builder) newNavigationFeed(title, path string, page, totalItems, pageSize int) (*Feed, string, int, time.Time) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 30
+	}
+
+	now := time.Now()
+	feedURL := b.baseURL + path
+	feedID := feedURL
+	if page > 1 {
+		feedID = fmt.Sprintf("%s?page=%d", feedURL, page)
+	}
+
+	feed := &Feed{
+		Xmlns:     "http://www.w3.org/2005/Atom",
+		XmlnsDC:   "http://purl.org/dc/terms/",
+		XmlnsOPDS: "http://opds-spec.org/2010/catalog",
+
+		ID:      feedID,
+		Title:   title,
+		Updated: now,
+
+		Author: &Person{
+			Name: b.catalogTitle,
+			URI:  b.baseURL,
+		},
+
+		Links: []Link{
+			{
+				Rel:  "self",
+				Type: TypeNavigation,
+				Href: feedID,
+			},
+			{
+				Rel:  RelStart,
+				Type: TypeNavigation,
+				Href: b.baseURL + "/opds",
+			},
+			{
+				Rel:  RelUp,
+				Type: TypeNavigation,
+				Href: b.baseURL + "/opds",
+			},
+		},
+	}
+
+	if page > 1 {
+		prevURL := b.buildPageURL(feedURL, page-1)
+		feed.Links = append(feed.Links, Link{
+			Rel:  RelPrev,
+			Type: TypeNavigation,
+			Href: prevURL,
+		})
+	}
+
+	if page*pageSize < totalItems {
+		nextURL := b.buildPageURL(feedURL, page+1)
+		feed.Links = append(feed.Links, Link{
+			Rel:  RelNext,
+			Type: TypeNavigation,
+			Href: nextURL,
+		})
+	}
+
+	return feed, feedURL, pageSize, now
+}
+
 // BuildBooksFeed creates a feed of books
 func (b *Builder) BuildBooksFeed(books []storage.Book, title, feedID string, page, totalBooks int) *Feed {
 	now := time.Now()
@@ -203,10 +350,12 @@ func (b *Builder) bookToEntry(book storage.Book) Entry {
 	}
 
 	// Add genre
+	var genreLabel string
 	if book.Genre != nil {
+		genreLabel = b.genreLabel(book.Genre.Name)
 		entry.Categories = append(entry.Categories, Category{
 			Term:  book.Genre.Name,
-			Label: book.Genre.Name,
+			Label: genreLabel,
 		})
 	}
 
@@ -232,39 +381,40 @@ func (b *Builder) bookToEntry(book storage.Book) Entry {
 	})
 
 	// Add content with details
-	if book.Series != nil || book.Year > 0 || book.Format != "" {
-		var details []string
+	var details []string
+	if genreLabel != "" {
+		details = append(details, "Жанр: "+genreLabel)
+	}
 
-		if book.Series != nil {
-			seriesInfo := book.Series.Name
-			if book.SeriesNum > 0 {
-				seriesInfo += fmt.Sprintf(" #%d", book.SeriesNum)
-			}
-			details = append(details, "Серия: "+seriesInfo)
+	if book.Series != nil {
+		seriesInfo := book.Series.Name
+		if book.SeriesNum > 0 {
+			seriesInfo += fmt.Sprintf(" #%d", book.SeriesNum)
+		}
+		details = append(details, "Серия: "+seriesInfo)
+	}
+
+	if book.Year > 0 {
+		details = append(details, "Год: "+strconv.Itoa(book.Year))
+	}
+
+	if book.Format != "" {
+		details = append(details, "Формат: "+strings.ToUpper(book.Format))
+	}
+
+	if book.FileSize > 0 {
+		details = append(details, "Размер: "+b.formatFileSize(book.FileSize))
+	}
+
+	if len(details) > 0 {
+		content := strings.Join(details, "\n")
+		if book.Annotation != "" {
+			content = book.Annotation + "\n\n" + content
 		}
 
-		if book.Year > 0 {
-			details = append(details, "Год: "+strconv.Itoa(book.Year))
-		}
-
-		if book.Format != "" {
-			details = append(details, "Формат: "+strings.ToUpper(book.Format))
-		}
-
-		if book.FileSize > 0 {
-			details = append(details, "Размер: "+b.formatFileSize(book.FileSize))
-		}
-
-		if len(details) > 0 {
-			content := strings.Join(details, "\n")
-			if book.Annotation != "" {
-				content = book.Annotation + "\n\n" + content
-			}
-
-			entry.Content = &Content{
-				Type: "text",
-				Text: content,
-			}
+		entry.Content = &Content{
+			Type: "text",
+			Text: content,
 		}
 	}
 

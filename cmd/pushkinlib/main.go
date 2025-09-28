@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -60,9 +61,19 @@ func main() {
 	handlers := api.NewHandlers(repo, cfg.BooksDir, cfg.INPXPath)
 	router := api.SetupRoutes(handlers)
 
+	// Load genre translations for OPDS
+	genreNames, err := opds.LoadGenreNames(cfg.GenresCSVPath)
+	if err != nil {
+		log.Printf("Failed to load genre translations from %s: %v", cfg.GenresCSVPath, err)
+	}
+
 	// Setup OPDS routes
-	baseURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
-	opdsHandler := opds.NewHandler(repo, baseURL, cfg.CatalogTitle)
+	baseURL := strings.TrimSpace(cfg.PublicBaseURL)
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Port)
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	opdsHandler := opds.NewHandler(repo, baseURL, cfg.CatalogTitle, genreNames)
 	api.SetupOPDSRoutes(router, opdsHandler)
 
 	// Setup HTTP server
@@ -74,10 +85,11 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		fmt.Printf("Starting HTTP server on port %s\n", cfg.Port)
-		fmt.Printf("Web interface: http://localhost:%s/\n", cfg.Port)
-		fmt.Printf("API available at: http://localhost:%s/api/v1/books\n", cfg.Port)
-		fmt.Printf("OPDS catalog: http://localhost:%s/opds\n", cfg.Port)
-		fmt.Printf("Health check at: http://localhost:%s/health\n", cfg.Port)
+		fmt.Printf("Public base URL: %s\n", baseURL)
+		fmt.Printf("Web interface: %s/\n", baseURL)
+		fmt.Printf("API available at: %s/api/v1/books\n", baseURL)
+		fmt.Printf("OPDS catalog: %s/opds\n", baseURL)
+		fmt.Printf("Health check at: %s/health\n", baseURL)
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)

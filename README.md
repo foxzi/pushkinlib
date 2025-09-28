@@ -36,6 +36,8 @@ PORT=9090
 BOOKS_DIR=/path/to/books
 INPX_PATH=/path/to/catalog.inpx
 CATALOG_TITLE=Моя библиотека
+PUBLIC_BASE_URL=http://localhost:9090
+GENRES_CSV_PATH=./web/static/genres.csv
 ```
 
 ### 3. Запуск
@@ -44,10 +46,12 @@ CATALOG_TITLE=Моя библиотека
 ./pushkinlib
 ```
 
-Сервис будет доступен по адресам:
+Сервис будет доступен по адресу, указанному в `PUBLIC_BASE_URL` (по умолчанию `http://localhost:9090`):
 - **Web интерфейс**: http://localhost:9090/
 - **API**: http://localhost:9090/api/v1/books
 - **OPDS каталог**: http://localhost:9090/opds
+
+Для отображения дружественных названий жанров в OPDS и веб-интерфейсе используется CSV-файл `GENRES_CSV_PATH` (по умолчанию `./web/static/genres.csv`). Обновите его, если нужно скорректировать переводы жанров.
 
 ## Генерация каталога из книг
 

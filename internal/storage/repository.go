@@ -25,6 +25,162 @@ func NewRepository(db *Database) *Repository {
 	return &Repository{db: db}
 }
 
+// ListAuthors returns a paginated list of authors
+func (r *Repository) ListAuthors(limit, offset int) ([]Author, int, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := r.db.db.Query(
+		"SELECT id, name FROM authors ORDER BY LOWER(name) LIMIT ? OFFSET ?",
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query authors: %w", err)
+	}
+	defer rows.Close()
+
+	var authors []Author
+	for rows.Next() {
+		var author Author
+		if err := rows.Scan(&author.ID, &author.Name); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan author: %w", err)
+		}
+		authors = append(authors, author)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating authors: %w", err)
+	}
+
+	var total int
+	if err := r.db.db.QueryRow("SELECT COUNT(*) FROM authors").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count authors: %w", err)
+	}
+
+	return authors, total, nil
+}
+
+// GetAuthorByID returns an author by ID
+func (r *Repository) GetAuthorByID(authorID int) (*Author, error) {
+	var author Author
+	err := r.db.db.QueryRow("SELECT id, name FROM authors WHERE id = ?", authorID).Scan(&author.ID, &author.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load author %d: %w", authorID, err)
+	}
+	return &author, nil
+}
+
+// ListSeries returns a paginated list of series
+func (r *Repository) ListSeries(limit, offset int) ([]Series, int, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := r.db.db.Query(
+		"SELECT id, name FROM series ORDER BY LOWER(name) LIMIT ? OFFSET ?",
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query series: %w", err)
+	}
+	defer rows.Close()
+
+	var seriesList []Series
+	for rows.Next() {
+		var series Series
+		if err := rows.Scan(&series.ID, &series.Name); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan series: %w", err)
+		}
+		seriesList = append(seriesList, series)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating series: %w", err)
+	}
+
+	var total int
+	if err := r.db.db.QueryRow("SELECT COUNT(*) FROM series").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count series: %w", err)
+	}
+
+	return seriesList, total, nil
+}
+
+// GetSeriesByID returns a series by ID
+func (r *Repository) GetSeriesByID(seriesID int) (*Series, error) {
+	var series Series
+	err := r.db.db.QueryRow("SELECT id, name FROM series WHERE id = ?", seriesID).Scan(&series.ID, &series.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load series %d: %w", seriesID, err)
+	}
+	return &series, nil
+}
+
+// ListGenres returns a paginated list of genres
+func (r *Repository) ListGenres(limit, offset int) ([]Genre, int, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := r.db.db.Query(
+		"SELECT id, name FROM genres ORDER BY LOWER(name) LIMIT ? OFFSET ?",
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query genres: %w", err)
+	}
+	defer rows.Close()
+
+	var genres []Genre
+	for rows.Next() {
+		var genre Genre
+		if err := rows.Scan(&genre.ID, &genre.Name); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan genre: %w", err)
+		}
+		genres = append(genres, genre)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating genres: %w", err)
+	}
+
+	var total int
+	if err := r.db.db.QueryRow("SELECT COUNT(*) FROM genres").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count genres: %w", err)
+	}
+
+	return genres, total, nil
+}
+
+// GetGenreByID returns a genre by ID
+func (r *Repository) GetGenreByID(genreID int) (*Genre, error) {
+	var genre Genre
+	err := r.db.db.QueryRow("SELECT id, name FROM genres WHERE id = ?", genreID).Scan(&genre.ID, &genre.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load genre %d: %w", genreID, err)
+	}
+	return &genre, nil
+}
+
 // InsertBooks inserts multiple books from INPX parsing
 func (r *Repository) InsertBooks(books []inpx.Book) error {
 	tx, err := r.db.db.Begin()

@@ -23,5 +23,7 @@ func SetupOPDSRoutes(r chi.Router, opdsHandler *opds.Handler) {
 		// Books
 		r.Get("/books/new", opdsHandler.NewBooks)
 		r.Get("/authors/{id}", opdsHandler.BooksByAuthor)
+		r.Get("/series/{id}", opdsHandler.BooksBySeries)
+		r.Get("/genres/{id}", opdsHandler.BooksByGenre)
 	})
 }

@@ -20,6 +20,8 @@ services:
       - BASIC_AUTH_ENABLED=false
       - LOG_LEVEL=info
       - PAGE_SIZE=30
+      - PUBLIC_BASE_URL=http://localhost:9090
+      - GENRES_CSV_PATH=./web/static/genres.csv
 
     volumes:
       # Mount books directory

@@ -18,10 +18,13 @@ type Handler struct {
 }
 
 // NewHandler creates a new OPDS handler
-func NewHandler(repo *storage.Repository, baseURL, catalogTitle string) *Handler {
+func NewHandler(repo *storage.Repository, baseURL, catalogTitle string, genreNames map[string]string) *Handler {
+	if genreNames == nil {
+		genreNames = map[string]string{}
+	}
 	return &Handler{
 		repo:    repo,
-		builder: NewBuilder(baseURL, catalogTitle),
+		builder: NewBuilder(baseURL, catalogTitle, genreNames),
 	}
 }
 
@@ -101,32 +104,86 @@ func (h *Handler) SearchBooks(w http.ResponseWriter, r *http.Request) {
 
 // Authors serves authors catalog (navigation)
 func (h *Handler) Authors(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement authors navigation
-	h.notImplemented(w, "Authors catalog")
+	page := h.getPageFromQuery(r)
+	pageSize := 30
+	if page < 1 {
+		page = 1
+	}
+
+	authors, total, err := h.repo.ListAuthors(pageSize, (page-1)*pageSize)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := h.builder.BuildAuthorsFeed(authors, page, total, pageSize)
+	h.writeFeed(w, feed)
 }
 
 // Series serves series catalog (navigation)
 func (h *Handler) Series(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement series navigation
-	h.notImplemented(w, "Series catalog")
+	page := h.getPageFromQuery(r)
+	pageSize := 30
+	if page < 1 {
+		page = 1
+	}
+
+	seriesList, total, err := h.repo.ListSeries(pageSize, (page-1)*pageSize)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := h.builder.BuildSeriesFeed(seriesList, page, total, pageSize)
+	h.writeFeed(w, feed)
 }
 
 // Genres serves genres catalog (navigation)
 func (h *Handler) Genres(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement genres navigation
-	h.notImplemented(w, "Genres catalog")
+	page := h.getPageFromQuery(r)
+	pageSize := 30
+	if page < 1 {
+		page = 1
+	}
+
+	genres, total, err := h.repo.ListGenres(pageSize, (page-1)*pageSize)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := h.builder.BuildGenresFeed(genres, page, total, pageSize)
+	h.writeFeed(w, feed)
 }
 
 // BooksByAuthor serves books by specific author
 func (h *Handler) BooksByAuthor(w http.ResponseWriter, r *http.Request) {
-	authorID := chi.URLParam(r, "id")
+	authorIDParam := chi.URLParam(r, "id")
+	authorID, err := strconv.Atoi(authorIDParam)
+	if err != nil {
+		http.Error(w, "Invalid author ID", http.StatusBadRequest)
+		return
+	}
+
+	author, err := h.repo.GetAuthorByID(authorID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if author == nil {
+		http.Error(w, "Author not found", http.StatusNotFound)
+		return
+	}
+
 	page := h.getPageFromQuery(r)
 	pageSize := 30
 
-	// TODO: Implement filtering by author ID
 	filter := storage.BookFilter{
-		Limit:  pageSize,
-		Offset: (page - 1) * pageSize,
+		Authors:   []string{author.Name},
+		Limit:     pageSize,
+		Offset:    (page - 1) * pageSize,
+		SortBy:    "title",
+		SortOrder: "asc",
 	}
 
 	result, err := h.repo.SearchBooks(filter)
@@ -135,8 +192,104 @@ func (h *Handler) BooksByAuthor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := "Книги автора"
-	feedID := h.builder.baseURL + "/opds/authors/" + authorID
+	title := fmt.Sprintf("Книги автора %s", author.Name)
+	feedID := fmt.Sprintf("%s/opds/authors/%d", h.builder.baseURL, author.ID)
+	if page > 1 {
+		feedID += "?page=" + strconv.Itoa(page)
+	}
+
+	feed := h.builder.BuildBooksFeed(result.Books, title, feedID, page, result.Total)
+	h.writeFeed(w, feed)
+}
+
+// BooksBySeries serves books belonging to a specific series
+func (h *Handler) BooksBySeries(w http.ResponseWriter, r *http.Request) {
+	seriesIDParam := chi.URLParam(r, "id")
+	seriesID, err := strconv.Atoi(seriesIDParam)
+	if err != nil {
+		http.Error(w, "Invalid series ID", http.StatusBadRequest)
+		return
+	}
+
+	series, err := h.repo.GetSeriesByID(seriesID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if series == nil {
+		http.Error(w, "Series not found", http.StatusNotFound)
+		return
+	}
+
+	page := h.getPageFromQuery(r)
+	pageSize := 30
+
+	filter := storage.BookFilter{
+		Series:    []string{series.Name},
+		Limit:     pageSize,
+		Offset:    (page - 1) * pageSize,
+		SortBy:    "title",
+		SortOrder: "asc",
+	}
+
+	result, err := h.repo.SearchBooks(filter)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	title := fmt.Sprintf("Книги серии %s", series.Name)
+	feedID := fmt.Sprintf("%s/opds/series/%d", h.builder.baseURL, series.ID)
+	if page > 1 {
+		feedID += "?page=" + strconv.Itoa(page)
+	}
+
+	feed := h.builder.BuildBooksFeed(result.Books, title, feedID, page, result.Total)
+	h.writeFeed(w, feed)
+}
+
+// BooksByGenre serves books belonging to a specific genre
+func (h *Handler) BooksByGenre(w http.ResponseWriter, r *http.Request) {
+	genreIDParam := chi.URLParam(r, "id")
+	genreID, err := strconv.Atoi(genreIDParam)
+	if err != nil {
+		http.Error(w, "Invalid genre ID", http.StatusBadRequest)
+		return
+	}
+
+	genre, err := h.repo.GetGenreByID(genreID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if genre == nil {
+		http.Error(w, "Genre not found", http.StatusNotFound)
+		return
+	}
+
+	page := h.getPageFromQuery(r)
+	pageSize := 30
+
+	filter := storage.BookFilter{
+		Genres:    []string{genre.Name},
+		Limit:     pageSize,
+		Offset:    (page - 1) * pageSize,
+		SortBy:    "title",
+		SortOrder: "asc",
+	}
+
+	result, err := h.repo.SearchBooks(filter)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	genreLabel := h.builder.genreLabel(genre.Name)
+	title := fmt.Sprintf("Книги жанра %s", genreLabel)
+	feedID := fmt.Sprintf("%s/opds/genres/%d", h.builder.baseURL, genre.ID)
+	if page > 1 {
+		feedID += "?page=" + strconv.Itoa(page)
+	}
 
 	feed := h.builder.BuildBooksFeed(result.Books, title, feedID, page, result.Total)
 	h.writeFeed(w, feed)
