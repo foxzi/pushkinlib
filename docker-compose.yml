@@ -13,7 +13,7 @@ services:
     environment:
       - PORT=9090
       - BOOKS_DIR=/data/books
-      - INPX_PATH=/data/catalog/index.inpx
+      - INPX_PATH=/data/books/index.inpx
       - CACHE_DIR=/data/cache
       - DATABASE_PATH=/data/cache/pushkinlib.db
       - CATALOG_TITLE=Pushkinlib Docker Library
@@ -25,7 +25,6 @@ services:
 
     volumes:
       # Mount books directory
-      - ./sample-data:/data/catalog:ro
       - ./sample-data:/data/books:ro
       # Mount cache directory for database
       - cache_data:/data/cache
