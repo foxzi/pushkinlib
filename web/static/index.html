@@ -545,6 +545,35 @@
             background: var(--secondary-bg);
         }
 
+        /* Footer */
+        .footer {
+            background: var(--surface-color);
+            border-top: 1px solid var(--border-subtle);
+            padding: 2rem 0;
+            margin-top: 3rem;
+            text-align: center;
+            color: var(--muted-text);
+            font-size: 0.875rem;
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .footer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: var(--primary-color-hover);
+            text-decoration: underline;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -742,6 +771,22 @@
                 </div>
             </div>
         </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-content">
+                    <div>
+                        Powered by <strong>Pushkinlib</strong>
+                    </div>
+                    <div>
+                        <a href="https://github.com/foxzi/pushkinlib" target="_blank" rel="noopener noreferrer" class="footer-link">
+                            GitHub Repository
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </footer>
 
         <!-- Book Details Modal -->
         <div class="modal-overlay" v-if="selectedBook" @click="closeModal">
