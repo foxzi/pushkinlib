@@ -1,0 +1,41 @@
+services:
+  pushkinlib:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pushkinlib:latest
+    container_name: pushkinlib
+    restart: unless-stopped
+
+    ports:
+      - "9090:9090"
+
+    environment:
+      - PORT=9090
+      - BOOKS_DIR=/data/books
+      - INPX_PATH=/data/books/index.inpx
+      - CACHE_DIR=/data/cache
+      - DATABASE_PATH=/data/cache/pushkinlib.db
+      - CATALOG_TITLE=Pushkinlib Docker Library
+      - BASIC_AUTH_ENABLED=false
+      - LOG_LEVEL=info
+      - PAGE_SIZE=30
+      - PUBLIC_BASE_URL=http://localhost:9090
+      - GENRES_CSV_PATH=./web/static/genres.csv
+
+    volumes:
+      # Mount books directory
+      - ./books:/data/books:ro
+      # Mount cache directory for database
+      - cache_data:/data/cache
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  cache_data:
+    driver: local

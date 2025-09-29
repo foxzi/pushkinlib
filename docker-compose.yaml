@@ -1,9 +1,6 @@
 services:
   pushkinlib:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: pushkinlib:latest
+    image: ghcr.io/foxzi/pushkinlib:latest
     container_name: pushkinlib
     restart: unless-stopped
 
@@ -16,7 +13,7 @@ services:
       - INPX_PATH=/data/books/index.inpx
       - CACHE_DIR=/data/cache
       - DATABASE_PATH=/data/cache/pushkinlib.db
-      - CATALOG_TITLE=Pushkinlib Docker Library
+      - CATALOG_TITLE=Pushkinlib Library
       - BASIC_AUTH_ENABLED=false
       - LOG_LEVEL=info
       - PAGE_SIZE=30
@@ -25,7 +22,7 @@ services:
 
     volumes:
       # Mount books directory
-      - ./sample-data:/data/books:ro
+      - ./books:/data/books:ro
       # Mount cache directory for database
       - cache_data:/data/cache
 
@@ -35,11 +32,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pushkinlib.rule=Host(`pushkinlib.local`)"
-      - "traefik.http.services.pushkinlib.loadbalancer.server.port=9090"
 
 volumes:
   cache_data:

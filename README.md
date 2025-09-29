@@ -14,7 +14,41 @@ Web-сервис для просмотра локальной библиотек
 
 ## Быстрый старт
 
-### 1. Сборка
+### Запуск через Docker Compose (рекомендуется)
+
+```bash
+# Создайте директорию для книг
+mkdir -p books
+
+# Поместите туда ваши книги и INPX файл (например, books/index.inpx)
+
+# Запустите контейнер
+docker compose up -d
+```
+
+Сервис будет доступен по адресу http://localhost:9090:
+- **Web интерфейс**: http://localhost:9090/
+- **API**: http://localhost:9090/api/v1/books
+- **OPDS каталог**: http://localhost:9090/opds
+
+Основная конфигурация через переменные окружения в `docker-compose.yaml`:
+```yaml
+environment:
+  - PORT=9090
+  - BOOKS_DIR=/data/books
+  - INPX_PATH=/data/books/index.inpx
+  - CATALOG_TITLE=Pushkinlib Library
+  - PUBLIC_BASE_URL=http://localhost:9090
+```
+
+> Для разработки используйте `docker-compose.dev.yaml`, который собирает образ локально:
+> ```bash
+> docker compose -f docker-compose.dev.yaml up -d
+> ```
+
+### Запуск из исходников
+
+#### 1. Сборка
 
 ```bash
 CGO_ENABLED=1 go build -tags sqlite_fts5 -o pushkinlib ./cmd/pushkinlib
@@ -22,7 +56,7 @@ CGO_ENABLED=1 go build -tags sqlite_fts5 -o pushkinlib ./cmd/pushkinlib
 
 > Поиск использует модуль SQLite FTS5, поэтому сборка должна выполняться с включённым CGO и тегом `sqlite_fts5`.
 
-### 2. Конфигурация
+#### 2. Конфигурация
 
 Скопируйте и настройте конфигурацию:
 
@@ -40,16 +74,11 @@ PUBLIC_BASE_URL=http://localhost:9090
 GENRES_CSV_PATH=./web/static/genres.csv
 ```
 
-### 3. Запуск
+#### 3. Запуск
 
 ```bash
 ./pushkinlib
 ```
-
-Сервис будет доступен по адресу, указанному в `PUBLIC_BASE_URL` (по умолчанию `http://localhost:9090`):
-- **Web интерфейс**: http://localhost:9090/
-- **API**: http://localhost:9090/api/v1/books
-- **OPDS каталог**: http://localhost:9090/opds
 
 Для отображения дружественных названий жанров в OPDS и веб-интерфейсе используется CSV-файл `GENRES_CSV_PATH` (по умолчанию `./web/static/genres.csv`). Обновите его, если нужно скорректировать переводы жанров.
 
