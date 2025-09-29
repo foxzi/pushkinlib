@@ -18,6 +18,7 @@ cache/
 
 # Generated catalogs and archives
 sample-data/
+books/
 
 # Logs and temporary files
 *.log

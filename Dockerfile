@@ -19,6 +19,12 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Download vendor dependencies
+RUN apk add --no-cache curl bash && \
+    chmod +x ./scripts/download-deps.sh && \
+    ./scripts/download-deps.sh && \
+    apk del curl bash
+
 # Build the application
 RUN CGO_ENABLED=1 GOOS=linux go build -tags sqlite_fts5 -a -installsuffix cgo -o pushkinlib ./cmd/pushkinlib
 RUN CGO_ENABLED=1 GOOS=linux go build -tags sqlite_fts5 -a -installsuffix cgo -o catalog-generator ./cmd/catalog-generator

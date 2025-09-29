@@ -25,6 +25,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download vendor dependencies
+        run: |
+          chmod +x ./scripts/download-deps.sh
+          ./scripts/download-deps.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
