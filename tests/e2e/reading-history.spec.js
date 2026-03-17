@@ -187,9 +187,9 @@ test.describe('Reading History Feature', () => {
   test('Auto-finish detection when reaching last section', async ({ page }) => {
     // Save position at last section to trigger auto-finish
     // Route: PUT /api/v1/books/{id}/position
-    const response = await page.request.put(`${BASE_URL}/api/v1/books/100/position`, {
+    const response = await page.request.put(`${BASE_URL}/api/v1/books/000100/position`, {
       data: {
-        book_id: '100',
+        book_id: '000100',
         section: 21,  // last section (total_sections=22, 0-indexed -> section 21 = last)
         progress: 0.9,
         total_sections: 22
@@ -203,7 +203,7 @@ test.describe('Reading History Feature', () => {
     const historyData = await historyResp.json();
     console.log('Finished books:', JSON.stringify(historyData));
     
-    const finishedBook = historyData.items.find(item => item.book_id === '100');
+    const finishedBook = historyData.items.find(item => item.book_id === '000100');
     expect(finishedBook).toBeTruthy();
     expect(finishedBook.status).toBe('finished');
     expect(finishedBook.progress_percent).toBe(100);
