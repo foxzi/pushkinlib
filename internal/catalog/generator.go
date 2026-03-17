@@ -28,24 +28,24 @@ func NewGenerator() *Generator {
 
 // GenerateOptions contains options for catalog generation
 type GenerateOptions struct {
-	BooksDir        string
-	OutputDir       string
-	CatalogName     string
-	ArchivePrefix   string
-	MaxBooksPerZip  int
-	IncludeFormats  []string
+	BooksDir       string
+	OutputDir      string
+	CatalogName    string
+	ArchivePrefix  string
+	MaxBooksPerZip int
+	IncludeFormats []string
 }
 
 // GenerationResult contains results of catalog generation
 type GenerationResult struct {
-	TotalBooks      int
-	ProcessedBooks  int
-	SkippedBooks    int
-	GeneratedZips   []string
-	INPXPath        string
-	CollectionInfo  CollectionInfo
-	ProcessingTime  time.Duration
-	Errors          []error
+	TotalBooks     int
+	ProcessedBooks int
+	SkippedBooks   int
+	GeneratedZips  []string
+	INPXPath       string
+	CollectionInfo CollectionInfo
+	ProcessingTime time.Duration
+	Errors         []error
 }
 
 // CollectionInfo represents collection metadata
@@ -190,8 +190,12 @@ func (g *Generator) createBookArchives(allMetadata []*metadata.BookMetadata, opt
 		if currentBooks == 0 || currentBooks >= opts.MaxBooksPerZip {
 			// Close previous archive
 			if currentZipWriter != nil {
-				currentZipWriter.Close()
-				currentZipFile.Close()
+				if err := currentZipWriter.Close(); err != nil {
+					return nil, fmt.Errorf("failed to finalize zip archive %s: %w", currentZipPath, err)
+				}
+				if err := currentZipFile.Close(); err != nil {
+					return nil, fmt.Errorf("failed to close zip file %s: %w", currentZipPath, err)
+				}
 			}
 
 			// Create new archive
@@ -230,8 +234,12 @@ func (g *Generator) createBookArchives(allMetadata []*metadata.BookMetadata, opt
 
 	// Close last archive
 	if currentZipWriter != nil {
-		currentZipWriter.Close()
-		currentZipFile.Close()
+		if err := currentZipWriter.Close(); err != nil {
+			return nil, fmt.Errorf("failed to finalize zip archive %s: %w", currentZipPath, err)
+		}
+		if err := currentZipFile.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close zip file %s: %w", currentZipPath, err)
+		}
 	}
 
 	return zipPaths, nil
@@ -280,10 +288,14 @@ func (g *Generator) generateINPX(allMetadata []*metadata.BookMetadata, opts Gene
 	if err != nil {
 		return "", collectionInfo, fmt.Errorf("failed to create INPX file: %w", err)
 	}
-	defer inpxFile.Close()
+	closeINPX := true
+	defer func() {
+		if closeINPX {
+			inpxFile.Close()
+		}
+	}()
 
 	zipWriter := zip.NewWriter(inpxFile)
-	defer zipWriter.Close()
 
 	// Group books by archive
 	archiveBooks := make(map[string][]*metadata.BookMetadata)
@@ -296,12 +308,14 @@ func (g *Generator) generateINPX(allMetadata []*metadata.BookMetadata, opts Gene
 		inpFileName := archiveName + ".inp"
 		inpWriter, err := zipWriter.Create(inpFileName)
 		if err != nil {
+			zipWriter.Close()
 			return "", collectionInfo, fmt.Errorf("failed to create INP file: %w", err)
 		}
 
 		for _, meta := range books {
 			line := g.formatINPLine(meta)
 			if _, err := inpWriter.Write([]byte(line + "\n")); err != nil {
+				zipWriter.Close()
 				return "", collectionInfo, fmt.Errorf("failed to write INP line: %w", err)
 			}
 		}
@@ -310,6 +324,7 @@ func (g *Generator) generateINPX(allMetadata []*metadata.BookMetadata, opts Gene
 	// Create collection.info
 	infoWriter, err := zipWriter.Create("collection.info")
 	if err != nil {
+		zipWriter.Close()
 		return "", collectionInfo, fmt.Errorf("failed to create collection.info: %w", err)
 	}
 
@@ -319,17 +334,31 @@ func (g *Generator) generateINPX(allMetadata []*metadata.BookMetadata, opts Gene
 		collectionInfo.Description)
 
 	if _, err := infoWriter.Write([]byte(infoContent)); err != nil {
+		zipWriter.Close()
 		return "", collectionInfo, fmt.Errorf("failed to write collection.info: %w", err)
 	}
 
 	// Create version.info
 	versionWriter, err := zipWriter.Create("version.info")
 	if err != nil {
+		zipWriter.Close()
 		return "", collectionInfo, fmt.Errorf("failed to create version.info: %w", err)
 	}
 
 	if _, err := versionWriter.Write([]byte(collectionInfo.Version + "\n")); err != nil {
+		zipWriter.Close()
 		return "", collectionInfo, fmt.Errorf("failed to write version.info: %w", err)
+	}
+
+	// Close zip writer explicitly to check for errors (flushes central directory)
+	if err := zipWriter.Close(); err != nil {
+		return "", collectionInfo, fmt.Errorf("failed to finalize INPX zip: %w", err)
+	}
+
+	// Close the underlying file explicitly to check for errors
+	closeINPX = false
+	if err := inpxFile.Close(); err != nil {
+		return "", collectionInfo, fmt.Errorf("failed to close INPX file: %w", err)
 	}
 
 	return inpxPath, collectionInfo, nil
@@ -340,21 +369,21 @@ func (g *Generator) formatINPLine(meta *metadata.BookMetadata) string {
 	// AUTHOR\x04GENRE\x04TITLE\x04SERIES\x04SERIES_NUM\x04BOOK_ID\x04SIZE\x04ARCHIVE_PATH\x04FILE_NUM\x04FORMAT\x04DATE\x04LANG\x04RATING\x04ANNOTATION\x04
 
 	fields := []string{
-		strings.Join(meta.Authors, ","),                 // AUTHOR
-		strings.Join(meta.Genres, ","),                  // GENRE
-		meta.Title,                                      // TITLE
-		meta.Series,                                     // SERIES
-		strconv.Itoa(meta.SeriesNum),                   // SERIES_NUM
-		meta.ID,                                         // BOOK_ID
-		strconv.FormatInt(meta.FileSize, 10),           // SIZE
-		meta.ArchivePath,                               // ARCHIVE_PATH
-		meta.FileNum,                                   // FILE_NUM
-		meta.Format,                                    // FORMAT
-		meta.Date.Format("2006-01-02"),                // DATE
-		meta.Language,                                  // LANG
-		"0",                                            // RATING (default)
-		meta.Annotation,                                // ANNOTATION
-		"",                                             // End marker
+		strings.Join(meta.Authors, ","),      // AUTHOR
+		strings.Join(meta.Genres, ","),       // GENRE
+		meta.Title,                           // TITLE
+		meta.Series,                          // SERIES
+		strconv.Itoa(meta.SeriesNum),         // SERIES_NUM
+		meta.ID,                              // BOOK_ID
+		strconv.FormatInt(meta.FileSize, 10), // SIZE
+		meta.ArchivePath,                     // ARCHIVE_PATH
+		meta.FileNum,                         // FILE_NUM
+		meta.Format,                          // FORMAT
+		meta.Date.Format("2006-01-02"),       // DATE
+		meta.Language,                        // LANG
+		"0",                                  // RATING (default)
+		meta.Annotation,                      // ANNOTATION
+		"",                                   // End marker
 	}
 
 	return strings.Join(fields, "\x04")

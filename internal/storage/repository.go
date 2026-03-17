@@ -339,7 +339,28 @@ func (r *Repository) captureBulkImportPragmaSnapshot() (*pragmaSnapshot, error) 
 	}, nil
 }
 
+// allowedPragmas is the set of PRAGMA names that can be used with pragmaInt/setPragmaInt/pragmaString.
+var allowedPragmas = map[string]bool{
+	"synchronous":  true,
+	"temp_store":   true,
+	"cache_size":   true,
+	"journal_mode": true,
+}
+
+// allowedJournalModes is the set of valid SQLite journal modes.
+var allowedJournalModes = map[string]bool{
+	"DELETE":   true,
+	"TRUNCATE": true,
+	"PERSIST":  true,
+	"MEMORY":   true,
+	"WAL":      true,
+	"OFF":      true,
+}
+
 func (r *Repository) pragmaInt(name string) (int, error) {
+	if !allowedPragmas[name] {
+		return 0, fmt.Errorf("disallowed PRAGMA name: %s", name)
+	}
 	var value int
 	query := fmt.Sprintf("PRAGMA %s", name)
 	if err := r.db.db.QueryRow(query).Scan(&value); err != nil {
@@ -349,6 +370,9 @@ func (r *Repository) pragmaInt(name string) (int, error) {
 }
 
 func (r *Repository) setPragmaInt(name string, value int) error {
+	if !allowedPragmas[name] {
+		return fmt.Errorf("disallowed PRAGMA name: %s", name)
+	}
 	query := fmt.Sprintf("PRAGMA %s = %d", name, value)
 	if _, err := r.db.db.Exec(query); err != nil {
 		return fmt.Errorf("failed to set PRAGMA %s: %w", name, err)
@@ -357,6 +381,9 @@ func (r *Repository) setPragmaInt(name string, value int) error {
 }
 
 func (r *Repository) pragmaString(name string) (string, error) {
+	if !allowedPragmas[name] {
+		return "", fmt.Errorf("disallowed PRAGMA name: %s", name)
+	}
 	var value string
 	query := fmt.Sprintf("PRAGMA %s", name)
 	if err := r.db.db.QueryRow(query).Scan(&value); err != nil {
@@ -367,6 +394,9 @@ func (r *Repository) pragmaString(name string) (string, error) {
 
 func (r *Repository) setPragmaJournalMode(mode string) (string, error) {
 	normalized := strings.ToUpper(mode)
+	if !allowedJournalModes[normalized] {
+		return "", fmt.Errorf("disallowed journal_mode: %s", normalized)
+	}
 	query := fmt.Sprintf("PRAGMA journal_mode = %s", normalized)
 	var result string
 	if err := r.db.db.QueryRow(query).Scan(&result); err != nil {

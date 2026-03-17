@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -57,17 +58,17 @@ type BookFilter struct {
 	YearTo    int      `json:"year_to,omitempty"`
 	Limit     int      `json:"limit,omitempty"`
 	Offset    int      `json:"offset,omitempty"`
-	SortBy    string   `json:"sort_by,omitempty"` // title, year, date_added, relevance
+	SortBy    string   `json:"sort_by,omitempty"`    // title, year, date_added, relevance
 	SortOrder string   `json:"sort_order,omitempty"` // asc, desc
 }
 
 // BookList represents paginated book results
 type BookList struct {
-	Books      []Book `json:"books"`
-	Total      int    `json:"total"`
-	Limit      int    `json:"limit"`
-	Offset     int    `json:"offset"`
-	HasMore    bool   `json:"has_more"`
+	Books   []Book `json:"books"`
+	Total   int    `json:"total"`
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	HasMore bool   `json:"has_more"`
 }
 
 // StringArray is a helper type for JSON arrays in database
@@ -87,5 +88,12 @@ func (sa *StringArray) Scan(value interface{}) error {
 		*sa = StringArray{}
 		return nil
 	}
-	return json.Unmarshal(value.([]byte), sa)
+	switch v := value.(type) {
+	case []byte:
+		return json.Unmarshal(v, sa)
+	case string:
+		return json.Unmarshal([]byte(v), sa)
+	default:
+		return fmt.Errorf("unsupported type for StringArray: %T", value)
+	}
 }

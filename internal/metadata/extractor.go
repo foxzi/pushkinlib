@@ -93,9 +93,10 @@ func (e *Extractor) extractFB2ZipMetadata(metadata *BookMetadata) (*BookMetadata
 			if err != nil {
 				continue
 			}
-			defer rc.Close()
 
-			return e.parseFB2Content(rc, metadata)
+			result, parseErr := e.parseFB2Content(rc, metadata)
+			rc.Close()
+			return result, parseErr
 		}
 	}
 

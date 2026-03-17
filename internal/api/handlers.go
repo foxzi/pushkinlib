@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/piligrim/pushkinlib/internal/indexer"
@@ -20,9 +21,10 @@ import (
 
 // Handlers contains all API handlers
 type Handlers struct {
-	repo     *storage.Repository
-	booksDir string
-	inpxPath string
+	repo      *storage.Repository
+	booksDir  string
+	inpxPath  string
+	reindexMu sync.Mutex
 }
 
 // NewHandlers creates new API handlers
@@ -36,6 +38,12 @@ func NewHandlers(repo *storage.Repository, booksDir, inpxPath string) *Handlers 
 
 // ReindexLibrary clears database and re-imports data from INPX
 func (h *Handlers) ReindexLibrary(w http.ResponseWriter, r *http.Request) {
+	if !h.reindexMu.TryLock() {
+		http.Error(w, "Reindex is already in progress", http.StatusServiceUnavailable)
+		return
+	}
+	defer h.reindexMu.Unlock()
+
 	result, err := indexer.ReindexFromINPX(h.repo, h.inpxPath)
 	if err != nil {
 		switch {
@@ -68,16 +76,26 @@ func (h *Handlers) ReindexLibrary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("ReindexLibrary: failed to encode response: %v", err)
+	}
 }
+
+// maxLimit is the maximum allowed page size to prevent excessive memory usage
+const maxLimit = 200
 
 // SearchBooks handles book search requests
 func (h *Handlers) SearchBooks(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
+	limit := parseInt(query.Get("limit"), 30)
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+
 	filter := storage.BookFilter{
 		Query:     query.Get("q"),
-		Limit:     parseInt(query.Get("limit"), 30),
+		Limit:     limit,
 		Offset:    parseInt(query.Get("offset"), 0),
 		SortBy:    query.Get("sort_by"),
 		SortOrder: query.Get("sort_order"),
@@ -109,7 +127,9 @@ func (h *Handlers) SearchBooks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Printf("SearchBooks: failed to encode response: %v", err)
+	}
 }
 
 // GetBookByID handles getting a single book by ID
@@ -132,7 +152,9 @@ func (h *Handlers) GetBookByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(book)
+	if err := json.NewEncoder(w).Encode(book); err != nil {
+		log.Printf("GetBookByID: failed to encode response: %v", err)
+	}
 }
 
 // DownloadBook handles book download requests
@@ -169,19 +191,26 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 		archiveName += ".zip"
 	}
 	archivePath := filepath.Join(h.booksDir, archiveName)
-	log.Printf("Download: book_id=%s resolved archive path %s", book.ID, archivePath)
 
-	// Check if archive exists
-	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
-		log.Printf("Download: book_id=%s archive missing: %s", book.ID, archivePath)
-		http.Error(w, "Book archive not found", http.StatusNotFound)
+	// Validate that the resolved path is within booksDir to prevent path traversal
+	cleanArchivePath := filepath.Clean(archivePath)
+	cleanBooksDir := filepath.Clean(h.booksDir)
+	if !strings.HasPrefix(cleanArchivePath, cleanBooksDir+string(os.PathSeparator)) && cleanArchivePath != cleanBooksDir {
+		log.Printf("Download: book_id=%s path traversal attempt: %s", book.ID, archivePath)
+		http.Error(w, "Invalid archive path", http.StatusBadRequest)
 		return
 	}
-	log.Printf("Download: book_id=%s archive=%s (expected file %s.%s)", book.ID, archivePath, book.FileNum, book.Format)
+	log.Printf("Download: book_id=%s resolved archive path %s", book.ID, archivePath)
 
-	// Open archive
+	// Open archive directly (no separate os.Stat check to avoid TOCTOU race)
 	archive, err := zip.OpenReader(archivePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("Download: book_id=%s archive missing: %s", book.ID, archivePath)
+			http.Error(w, "Book archive not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Download: book_id=%s failed to open archive %s: %v", book.ID, archivePath, err)
 		http.Error(w, "Failed to open archive", http.StatusInternalServerError)
 		return
 	}
@@ -238,7 +267,9 @@ func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("HealthCheck: failed to encode response: %v", err)
+	}
 }
 
 // sanitizeFilename removes invalid characters from filename

@@ -129,10 +129,12 @@ func main() {
 	fmt.Println()
 
 	// Test command
-	fmt.Println("=== Test Command ===")
-	fmt.Printf("To test with the generated catalog:\n")
-	fmt.Printf("INPX_PATH=%s BOOKS_DIR=%s ./pushkinlib\n",
-		result.INPXPath, filepath.Dir(result.GeneratedZips[0]))
+	if len(result.GeneratedZips) > 0 {
+		fmt.Println("=== Test Command ===")
+		fmt.Printf("To test with the generated catalog:\n")
+		fmt.Printf("INPX_PATH=%s BOOKS_DIR=%s ./pushkinlib\n",
+			result.INPXPath, filepath.Dir(result.GeneratedZips[0]))
+	}
 
 	fmt.Println("\n✅ Catalog generation completed successfully!")
 }

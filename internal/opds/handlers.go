@@ -1,10 +1,13 @@
 package opds
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -297,16 +300,20 @@ func (h *Handler) BooksByGenre(w http.ResponseWriter, r *http.Request) {
 
 // OpenSearch serves OpenSearch description
 func (h *Handler) OpenSearch(w http.ResponseWriter, r *http.Request) {
+	// Escape XML-special characters to prevent XML injection
+	title := xmlEscape(h.builder.catalogTitle)
+	baseURL := xmlEscape(h.builder.baseURL)
+
 	description := `<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
-    <ShortName>` + h.builder.catalogTitle + `</ShortName>
-    <Description>Поиск книг в каталоге ` + h.builder.catalogTitle + `</Description>
+    <ShortName>` + title + `</ShortName>
+    <Description>Поиск книг в каталоге ` + title + `</Description>
     <Tags>books library catalog</Tags>
     <Contact>admin@example.com</Contact>
     <Url type="application/atom+xml;profile=opds-catalog"
-         template="` + h.builder.baseURL + `/opds/search?q={searchTerms}"/>
-    <LongName>` + h.builder.catalogTitle + ` - поиск книг</LongName>
-    <Image height="64" width="64" type="image/png">` + h.builder.baseURL + `/favicon.ico</Image>
+         template="` + baseURL + `/opds/search?q={searchTerms}"/>
+    <LongName>` + title + ` - поиск книг</LongName>
+    <Image height="64" width="64" type="image/png">` + baseURL + `/favicon.ico</Image>
     <Query role="example" searchTerms="фантастика"/>
     <Developer>Pushkinlib</Developer>
     <Attribution>Pushkinlib OPDS catalog</Attribution>
@@ -318,7 +325,24 @@ func (h *Handler) OpenSearch(w http.ResponseWriter, r *http.Request) {
 </OpenSearchDescription>`
 
 	w.Header().Set("Content-Type", "application/opensearchdescription+xml; charset=utf-8")
-	w.Write([]byte(description))
+	if _, err := w.Write([]byte(description)); err != nil {
+		log.Printf("OpenSearch: failed to write response: %v", err)
+	}
+}
+
+// xmlEscape escapes XML-special characters in a string
+func xmlEscape(s string) string {
+	var buf bytes.Buffer
+	if err := xml.EscapeText(&buf, []byte(s)); err != nil {
+		return strings.NewReplacer(
+			"&", "&amp;",
+			"<", "&lt;",
+			">", "&gt;",
+			"\"", "&quot;",
+			"'", "&apos;",
+		).Replace(s)
+	}
+	return buf.String()
 }
 
 // getPageFromQuery extracts page number from query parameters
@@ -338,18 +362,21 @@ func (h *Handler) getPageFromQuery(r *http.Request) int {
 
 // writeFeed writes OPDS feed as XML
 func (h *Handler) writeFeed(w http.ResponseWriter, feed *Feed) {
-	w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// Marshal to buffer first so we can still send an error status if encoding fails
+	var buf bytes.Buffer
+	buf.WriteString(xml.Header)
 
-	// Write XML header
-	w.Write([]byte(xml.Header))
-
-	// Encode feed
-	encoder := xml.NewEncoder(w)
+	encoder := xml.NewEncoder(&buf)
 	encoder.Indent("", "  ")
 	if err := encoder.Encode(feed); err != nil {
 		http.Error(w, "Failed to encode feed", http.StatusInternalServerError)
 		return
+	}
+
+	w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		log.Printf("writeFeed: failed to write response: %v", err)
 	}
 }
 
