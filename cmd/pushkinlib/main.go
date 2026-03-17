@@ -64,6 +64,13 @@ func main() {
 
 	// Setup API routes
 	handlers := api.NewHandlers(repo, cfg.BooksDir, cfg.INPXPath)
+
+	// Configure TTS proxy if TTS_SERVER_URL is set
+	if cfg.TTSServerURL != "" {
+		handlers.SetTTSConfig(cfg.TTSServerURL, cfg.TTSAPIKey)
+		fmt.Printf("TTS server: %s\n", cfg.TTSServerURL)
+	}
+
 	router := api.SetupRoutes(handlers)
 
 	// Load genre translations for OPDS

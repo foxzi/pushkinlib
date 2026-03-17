@@ -21,6 +21,8 @@ type Config struct {
 	DatabasePath     string
 	PublicBaseURL    string
 	GenresCSVPath    string
+	TTSServerURL     string
+	TTSAPIKey        string
 }
 
 // LoadConfig loads configuration from environment variables
@@ -40,6 +42,8 @@ func LoadConfig() *Config {
 		DatabasePath:     getEnvOrDefault("DATABASE_PATH", "./cache/pushkinlib.db"),
 		PublicBaseURL:    getEnvOrDefault("PUBLIC_BASE_URL", ""),
 		GenresCSVPath:    getEnvOrDefault("GENRES_CSV_PATH", "./web/static/genres.csv"),
+		TTSServerURL:     getEnvOrDefault("TTS_SERVER_URL", ""),
+		TTSAPIKey:        getEnvOrDefault("TTS_API_KEY", ""),
 	}
 }
 

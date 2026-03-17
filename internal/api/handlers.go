@@ -24,6 +24,7 @@ type Handlers struct {
 	repo      *storage.Repository
 	booksDir  string
 	inpxPath  string
+	tts       *TTSConfig
 	reindexMu sync.Mutex
 }
 
@@ -33,6 +34,15 @@ func NewHandlers(repo *storage.Repository, booksDir, inpxPath string) *Handlers 
 		repo:     repo,
 		booksDir: booksDir,
 		inpxPath: inpxPath,
+		tts:      &TTSConfig{},
+	}
+}
+
+// SetTTSConfig sets the TTS proxy configuration.
+func (h *Handlers) SetTTSConfig(serverURL, apiKey string) {
+	h.tts = &TTSConfig{
+		ServerURL: serverURL,
+		APIKey:    apiKey,
 	}
 }
 

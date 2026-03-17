@@ -1101,6 +1101,66 @@
             border-color: var(--primary-color);
         }
 
+        /* TTS settings controls */
+        .settings-select {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid var(--surface-border);
+            border-radius: 4px;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .settings-range {
+            flex: 1;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .settings-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        .settings-checkbox-label input[type="checkbox"] {
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        /* TTS indicators */
+        .tts-indicator {
+            font-size: 0.75rem;
+            animation: tts-pulse 1.5s infinite;
+        }
+
+        .tts-indicator-auto {
+            font-size: 0.65rem;
+            color: var(--primary-color);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .tts-error {
+            font-size: 0.7rem;
+            color: #e53e3e;
+            margin-top: 0.25rem;
+        }
+
+        @keyframes tts-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .reader-control-btn.active {
+            color: var(--primary-color);
+        }
+
         /* Reader loading */
         .reader-loading {
             display: flex;
@@ -1714,6 +1774,13 @@
                                 :title="readerSidebarOpen ? 'Скрыть оглавление' : 'Показать оглавление'">
                             ☰
                         </button>
+                        <button class="reader-control-btn" v-if="ttsAvailable"
+                                :class="{ active: ttsPlaying }"
+                                @click="toggleTTS"
+                                :disabled="ttsLoading"
+                                :title="ttsPlaying ? 'Остановить озвучку' : 'Озвучить'">
+                            {{ ttsLoading ? '⏳' : (ttsPlaying ? '⏸' : '▶') }}
+                        </button>
                         <button class="reader-control-btn" @click="readerSettingsOpen = !readerSettingsOpen" title="Настройки">
                             ⚙
                         </button>
@@ -1749,6 +1816,32 @@
                     </button>
                 </div>
             </div>
+            <!-- TTS Settings -->
+            <template v-if="ttsAvailable">
+                <div class="settings-group">
+                    <div class="settings-label">Озвучка — голос</div>
+                    <div class="settings-row">
+                        <select class="settings-select" v-model="ttsVoice" @change="saveTTSSettings">
+                            <option v-for="v in ttsVoices" :key="v" :value="v">{{ v }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-label">Озвучка — скорость: {{ ttsSpeed.toFixed(1) }}x</div>
+                    <div class="settings-row">
+                        <input type="range" min="0.5" max="2.0" step="0.1" v-model.number="ttsSpeed"
+                               @change="saveTTSSettings" class="settings-range">
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-row">
+                        <label class="settings-checkbox-label">
+                            <input type="checkbox" v-model="ttsContinuous" @change="saveTTSSettings">
+                            Непрерывное чтение
+                        </label>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <!-- Reader Layout -->
@@ -1829,10 +1922,15 @@
                         ← Назад
                     </button>
                     <div class="reader-progress">
-                        <div>{{ readerSection + 1 }} / {{ readerTotalSections }}</div>
+                        <div>
+                            {{ readerSection + 1 }} / {{ readerTotalSections }}
+                            <span v-if="ttsPlaying" class="tts-indicator">🔊</span>
+                            <span v-if="ttsContinuous && ttsPlaying" class="tts-indicator-auto">авто</span>
+                        </div>
                         <div class="reader-progress-bar">
                             <div class="reader-progress-fill" :style="{ width: readerProgressPercent + '%' }"></div>
                         </div>
+                        <div v-if="ttsError" class="tts-error">{{ ttsError }}</div>
                     </div>
                     <button class="reader-nav-btn" :disabled="!readerHasNext" @click="nextSection">
                         Вперёд →
@@ -1985,7 +2083,19 @@
                     historyFilter: '',
                     historyLoading: false,
                     historyOffset: 0,
-                    historyLimit: 30
+                    historyLimit: 30,
+
+                    // TTS state
+                    ttsAvailable: false,
+                    ttsPlaying: false,
+                    ttsLoading: false,
+                    ttsContinuous: false,
+                    ttsVoice: 'xenia',
+                    ttsSpeed: 1.0,
+                    ttsVoices: [],
+                    ttsAudio: null,
+                    ttsSettingsOpen: false,
+                    ttsError: ''
                 };
             },
             computed: {
@@ -2364,6 +2474,7 @@
 
                 closeReader() {
                     this.savePosition();
+                    this.stopTTS();
                     this.currentView = 'library';
                     this.readerBook = null;
                     this.readerSettingsOpen = false;
@@ -2525,6 +2636,180 @@
                     } catch (e) {
                         console.warn('Failed to save reading position:', e);
                     }
+                },
+
+                // ==================== TTS METHODS ====================
+
+                async checkTTSAvailability() {
+                    try {
+                        const res = await axios.get(`${this.apiBase}/tts/status`);
+                        this.ttsAvailable = res.data.available === true;
+                        if (this.ttsAvailable) {
+                            this.loadTTSVoices();
+                            this.restoreTTSSettings();
+                        }
+                    } catch (e) {
+                        this.ttsAvailable = false;
+                    }
+                },
+
+                async loadTTSVoices() {
+                    try {
+                        const res = await axios.get(`${this.apiBase}/tts/voices`);
+                        // Parse models response — extract Russian voices
+                        const models = res.data;
+                        const voices = new Set();
+                        if (Array.isArray(models)) {
+                            for (const model of models) {
+                                if (model.model_id && model.model_id.includes('ru')) {
+                                    if (Array.isArray(model.speakers)) {
+                                        model.speakers.forEach(s => voices.add(s));
+                                    }
+                                }
+                            }
+                        }
+                        this.ttsVoices = voices.size > 0
+                            ? [...voices].sort()
+                            : ['aidar', 'baya', 'kseniya', 'xenia', 'eugene'];
+                        if (!this.ttsVoices.includes(this.ttsVoice)) {
+                            this.ttsVoice = this.ttsVoices[0] || 'xenia';
+                        }
+                    } catch (e) {
+                        // Fallback voices
+                        this.ttsVoices = ['aidar', 'baya', 'kseniya', 'xenia', 'eugene'];
+                    }
+                },
+
+                restoreTTSSettings() {
+                    try {
+                        const saved = localStorage.getItem('pushkinlib-tts-settings');
+                        if (saved) {
+                            const s = JSON.parse(saved);
+                            if (s.voice) this.ttsVoice = s.voice;
+                            if (s.speed) this.ttsSpeed = s.speed;
+                            if (s.continuous !== undefined) this.ttsContinuous = s.continuous;
+                        }
+                    } catch (e) { /* ignore */ }
+                },
+
+                saveTTSSettings() {
+                    try {
+                        localStorage.setItem('pushkinlib-tts-settings', JSON.stringify({
+                            voice: this.ttsVoice,
+                            speed: this.ttsSpeed,
+                            continuous: this.ttsContinuous
+                        }));
+                    } catch (e) { /* ignore */ }
+                },
+
+                toggleTTS() {
+                    if (this.ttsPlaying) {
+                        this.stopTTS();
+                    } else {
+                        this.playSectionTTS(this.readerSection);
+                    }
+                },
+
+                stopTTS() {
+                    this.ttsPlaying = false;
+                    this.ttsLoading = false;
+                    this.ttsError = '';
+                    if (this.ttsAudio) {
+                        this.ttsAudio.pause();
+                        this.ttsAudio.removeAttribute('src');
+                        this.ttsAudio = null;
+                    }
+                },
+
+                async playSectionTTS(sectionIndex) {
+                    if (!this.readerBook || !this.ttsAvailable) return;
+
+                    this.ttsError = '';
+                    this.ttsLoading = true;
+                    this.ttsPlaying = true;
+
+                    // Stop any currently playing audio
+                    if (this.ttsAudio) {
+                        this.ttsAudio.pause();
+                        this.ttsAudio.removeAttribute('src');
+                    }
+
+                    try {
+                        // Extract plain text from current section HTML
+                        const text = this.extractTextFromHTML(this.readerHTML);
+                        if (!text || text.trim().length === 0) {
+                            // Empty section — skip to next in continuous mode
+                            if (this.ttsContinuous && sectionIndex + 1 < this.readerTotalSections) {
+                                await this.nextSection();
+                                this.$nextTick(() => this.playSectionTTS(this.readerSection));
+                                return;
+                            }
+                            this.stopTTS();
+                            return;
+                        }
+
+                        // Request audio from TTS proxy
+                        const response = await axios.post(`${this.apiBase}/tts/speech`, {
+                            input: text,
+                            voice: this.ttsVoice,
+                            speed: this.ttsSpeed,
+                            model: 'v5_ru',
+                            response_format: 'opus'
+                        }, {
+                            responseType: 'blob'
+                        });
+
+                        // Check if user stopped while we were loading
+                        if (!this.ttsPlaying) return;
+
+                        const audioBlob = new Blob([response.data], { type: 'audio/ogg' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+
+                        this.ttsAudio = new Audio(audioUrl);
+                        this.ttsLoading = false;
+
+                        this.ttsAudio.onended = () => {
+                            URL.revokeObjectURL(audioUrl);
+                            if (this.ttsContinuous && this.ttsPlaying && sectionIndex + 1 < this.readerTotalSections) {
+                                // Continuous mode: advance to next section and play
+                                this.nextSection();
+                                this.$nextTick(() => {
+                                    this.playSectionTTS(this.readerSection);
+                                });
+                            } else {
+                                this.ttsPlaying = false;
+                                this.ttsAudio = null;
+                            }
+                        };
+
+                        this.ttsAudio.onerror = (e) => {
+                            URL.revokeObjectURL(audioUrl);
+                            console.error('TTS audio playback error:', e);
+                            this.ttsError = 'Ошибка воспроизведения';
+                            this.ttsPlaying = false;
+                            this.ttsAudio = null;
+                        };
+
+                        this.ttsAudio.play();
+                    } catch (error) {
+                        console.error('TTS synthesis error:', error);
+                        this.ttsLoading = false;
+                        if (error.response && error.response.status === 429) {
+                            this.ttsError = 'Превышен лимит запросов TTS';
+                        } else {
+                            this.ttsError = 'Ошибка синтеза речи';
+                        }
+                        this.ttsPlaying = false;
+                    }
+                },
+
+                extractTextFromHTML(html) {
+                    if (!html) return '';
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    // Remove images, scripts
+                    tmp.querySelectorAll('img, script, style').forEach(el => el.remove());
+                    return (tmp.textContent || tmp.innerText || '').trim();
                 },
 
                 // ==================== READING HISTORY METHODS ====================
@@ -2724,6 +3009,7 @@
 
                 this.loadGenreMap();
                 this.loadReadingHistory();
+                this.checkTTSAvailability();
             },
 
             beforeUnmount() {

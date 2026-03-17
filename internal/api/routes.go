@@ -52,6 +52,11 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 		// Reading history
 		r.Get("/reading-history", handlers.GetReadingHistory)
 
+		// TTS proxy endpoints
+		r.Get("/tts/status", handlers.GetTTSStatus)
+		r.Get("/tts/voices", handlers.GetTTSVoices)
+		r.Post("/tts/speech", handlers.SynthesizeSpeech)
+
 		r.Post("/admin/reindex", handlers.ReindexLibrary)
 	})
 
