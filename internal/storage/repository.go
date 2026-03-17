@@ -994,3 +994,39 @@ func (r *Repository) ClearAllBooks() error {
 	r.ftsFresh.Store(true)
 	return nil
 }
+
+// GetReadingPosition returns the saved reading position for a book, or nil if none.
+func (r *Repository) GetReadingPosition(bookID string) (*ReadingPosition, error) {
+	row := r.db.db.QueryRow(
+		"SELECT book_id, section, progress, updated_at FROM reading_positions WHERE book_id = ?",
+		bookID,
+	)
+
+	var pos ReadingPosition
+	err := row.Scan(&pos.BookID, &pos.Section, &pos.Progress, &pos.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get reading position: %w", err)
+	}
+
+	return &pos, nil
+}
+
+// SaveReadingPosition saves or updates the reading position for a book.
+func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
+	_, err := r.db.db.Exec(
+		`INSERT INTO reading_positions (book_id, section, progress, updated_at)
+		 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(book_id) DO UPDATE SET
+		   section = excluded.section,
+		   progress = excluded.progress,
+		   updated_at = CURRENT_TIMESTAMP`,
+		pos.BookID, pos.Section, pos.Progress,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save reading position: %w", err)
+	}
+	return nil
+}

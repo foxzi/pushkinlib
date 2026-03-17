@@ -71,6 +71,14 @@ type BookList struct {
 	HasMore bool   `json:"has_more"`
 }
 
+// ReadingPosition represents a saved reading position
+type ReadingPosition struct {
+	BookID    string    `json:"book_id" db:"book_id"`
+	Section   int       `json:"section" db:"section"`
+	Progress  float64   `json:"progress" db:"progress"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
 // StringArray is a helper type for JSON arrays in database
 type StringArray []string
 

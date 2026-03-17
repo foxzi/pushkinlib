@@ -41,6 +41,14 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/books", handlers.SearchBooks)
 		r.Get("/books/{id}", handlers.GetBookByID)
+
+		// Reader endpoints
+		r.Get("/books/{id}/toc", handlers.GetBookTOC)
+		r.Get("/books/{id}/content", handlers.GetBookContent)
+		r.Get("/books/{id}/image/{name}", handlers.GetBookImage)
+		r.Get("/books/{id}/position", handlers.GetReadingPosition)
+		r.Put("/books/{id}/position", handlers.SaveReadingPosition)
+
 		r.Post("/admin/reindex", handlers.ReindexLibrary)
 	})
 

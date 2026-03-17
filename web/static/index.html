@@ -615,10 +615,549 @@
                 flex-direction: column;
             }
         }
+
+        /* ========== Reader Styles ========== */
+
+        .reader-layout {
+            display: flex;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+        }
+
+        /* Reader header (replaces library header) */
+        .reader-header {
+            background: var(--surface-color);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .reader-header-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .reader-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .reader-back-btn:hover {
+            background: var(--secondary-bg);
+        }
+
+        .reader-book-title {
+            flex: 1;
+            font-size: 1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-color);
+            text-align: center;
+        }
+
+        .reader-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .reader-control-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--secondary-bg);
+            border: 1px solid var(--surface-border);
+            color: var(--button-secondary-text);
+            cursor: pointer;
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+
+        .reader-control-btn:hover {
+            background: var(--secondary-bg-hover);
+        }
+
+        .reader-control-btn.active {
+            background: var(--primary-color);
+            color: var(--button-primary-text);
+            border-color: var(--primary-color);
+        }
+
+        .reader-control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* TOC Sidebar */
+        .reader-sidebar {
+            width: 300px;
+            min-width: 300px;
+            background: var(--surface-color);
+            border-right: 1px solid var(--border-subtle);
+            overflow-y: auto;
+            transition: margin-left 0.3s ease;
+        }
+
+        .reader-sidebar.collapsed {
+            margin-left: -300px;
+        }
+
+        .toc-header {
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border-bottom: 1px solid var(--border-subtle);
+            position: sticky;
+            top: 0;
+            background: var(--surface-color);
+            z-index: 1;
+        }
+
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .toc-item {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: var(--secondary-text);
+            border-bottom: 1px solid var(--border-subtle);
+            transition: background-color 0.15s, color 0.15s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toc-item:hover {
+            background: var(--secondary-bg);
+            color: var(--text-color);
+        }
+
+        .toc-item.active {
+            background: var(--primary-color);
+            color: var(--button-primary-text);
+            font-weight: 600;
+        }
+
+        .toc-item-level-1 { padding-left: 2rem; }
+        .toc-item-level-2 { padding-left: 3rem; }
+        .toc-item-level-3 { padding-left: 4rem; }
+
+        .toc-item-notes {
+            font-style: italic;
+            color: var(--muted-text);
+        }
+
+        /* Reader Content Area */
+        .reader-content-area {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--background-color);
+        }
+
+        .reader-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        /* Display modes */
+        .reader-page-single {
+            max-width: 680px;
+            margin: 0 auto;
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 8px;
+            padding: 2.5rem 3rem;
+            min-height: 80vh;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .reader-page-spread {
+            display: flex;
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .reader-page-spread .reader-page-half {
+            flex: 1;
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 8px;
+            padding: 2rem 2.5rem;
+            min-height: 80vh;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .reader-page-scroll {
+            max-width: 780px;
+            margin: 0 auto;
+        }
+
+        .reader-page-scroll .scroll-section {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 8px;
+            padding: 2rem 2.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        /* Reader content typography */
+        .reader-content {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 1.1rem;
+            line-height: 1.75;
+            color: var(--text-color);
+        }
+
+        .reader-content h2.title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: var(--text-color);
+        }
+
+        .reader-content h3.subtitle {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5rem 0 1rem;
+            color: var(--text-color);
+        }
+
+        .reader-content h4.title,
+        .reader-content h5.title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-weight: 600;
+            margin: 1rem 0 0.75rem;
+            text-align: center;
+        }
+
+        .reader-content p {
+            text-indent: 1.5em;
+            margin-bottom: 0.25rem;
+        }
+
+        .reader-content p:first-child {
+            text-indent: 0;
+        }
+
+        .reader-content .epigraph {
+            margin: 1.5rem 0 2rem;
+            padding-left: 3rem;
+            font-style: italic;
+            color: var(--secondary-text);
+            border-left: 3px solid var(--border-subtle);
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .reader-content .epigraph .text-author {
+            font-style: normal;
+            text-align: right;
+            margin-top: 0.5rem;
+            font-size: 0.9em;
+            color: var(--muted-text);
+        }
+
+        .reader-content .poem {
+            margin: 1.5rem 0;
+            padding-left: 2rem;
+        }
+
+        .reader-content .stanza {
+            margin-bottom: 1rem;
+        }
+
+        .reader-content .verse {
+            margin-bottom: 0.15rem;
+        }
+
+        .reader-content .poem .text-author {
+            text-align: right;
+            margin-top: 0.75rem;
+            font-style: italic;
+            color: var(--muted-text);
+        }
+
+        .reader-content .cite {
+            margin: 1.5rem 0;
+            padding: 1rem 1.5rem;
+            border-left: 3px solid var(--primary-color);
+            background: var(--secondary-bg);
+            border-radius: 0 6px 6px 0;
+        }
+
+        .reader-content .cite .text-author {
+            text-align: right;
+            font-style: italic;
+            margin-top: 0.5rem;
+            color: var(--muted-text);
+        }
+
+        .reader-content .empty-line {
+            height: 1.5em;
+        }
+
+        .reader-content .image {
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+
+        .reader-content .image img {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 4px;
+        }
+
+        .reader-content .inline-image {
+            max-height: 1.2em;
+            vertical-align: middle;
+        }
+
+        .reader-content .annotation {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--secondary-bg);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .reader-content .footnote-ref {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.85em;
+            vertical-align: super;
+            cursor: pointer;
+        }
+
+        .reader-content .footnote-ref:hover {
+            text-decoration: underline;
+        }
+
+        .reader-content .fb2-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        .reader-content .fb2-table td,
+        .reader-content .fb2-table th {
+            border: 1px solid var(--border-subtle);
+            padding: 0.5rem;
+        }
+
+        .reader-content .fb2-table th {
+            background: var(--secondary-bg);
+            font-weight: 600;
+        }
+
+        .reader-content .subsection {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        /* Reader navigation bar (bottom) */
+        .reader-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            background: var(--surface-color);
+            border-top: 1px solid var(--border-subtle);
+            gap: 1rem;
+        }
+
+        .reader-nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem 1rem;
+            background: var(--secondary-bg);
+            border: 1px solid var(--surface-border);
+            border-radius: 6px;
+            color: var(--button-secondary-text);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .reader-nav-btn:hover:not(:disabled) {
+            background: var(--secondary-bg-hover);
+        }
+
+        .reader-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .reader-progress {
+            flex: 1;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--muted-text);
+        }
+
+        .reader-progress-bar {
+            height: 4px;
+            background: var(--secondary-bg);
+            border-radius: 2px;
+            margin-top: 0.25rem;
+            overflow: hidden;
+        }
+
+        .reader-progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* Settings panel */
+        .reader-settings-panel {
+            position: absolute;
+            top: 60px;
+            right: 1rem;
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            z-index: 200;
+            min-width: 240px;
+        }
+
+        .settings-group {
+            margin-bottom: 1rem;
+        }
+
+        .settings-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .settings-label {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+            margin-bottom: 0.4rem;
+            font-weight: 600;
+        }
+
+        .settings-row {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .settings-btn {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid var(--surface-border);
+            border-radius: 4px;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
+            cursor: pointer;
+            font-size: 0.8rem;
+            text-align: center;
+            transition: background-color 0.15s;
+        }
+
+        .settings-btn:hover {
+            background: var(--secondary-bg-hover);
+        }
+
+        .settings-btn.active {
+            background: var(--primary-color);
+            color: var(--button-primary-text);
+            border-color: var(--primary-color);
+        }
+
+        /* Reader loading */
+        .reader-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--muted-text);
+        }
+
+        /* Reader responsive */
+        @media (max-width: 768px) {
+            .reader-sidebar {
+                position: fixed;
+                left: 0;
+                top: 60px;
+                bottom: 0;
+                z-index: 150;
+                box-shadow: 4px 0 16px rgba(0,0,0,0.2);
+            }
+
+            .reader-sidebar.collapsed {
+                margin-left: -300px;
+            }
+
+            .reader-page-spread {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .reader-page-single {
+                padding: 1.5rem;
+            }
+
+            .reader-body {
+                padding: 1rem;
+            }
+
+            .reader-book-title {
+                font-size: 0.85rem;
+            }
+
+            .reader-content {
+                font-size: 1rem;
+            }
+
+            .reader-settings-panel {
+                right: 0.5rem;
+                left: 0.5rem;
+                min-width: auto;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="app">
+        <!-- ==================== LIBRARY VIEW ==================== -->
+        <template v-if="currentView === 'library'">
         <!-- Header -->
         <header class="header">
             <div class="container">
@@ -729,11 +1268,14 @@
                                 <div class="book-annotation" v-if="book.annotation" v-html="highlightText(book.annotation)"></div>
 
                                 <div class="book-actions">
-                                    <button class="btn btn-primary" @click="downloadBook(book)">
+                                    <button class="btn btn-primary" @click="openReader(book)">
+                                        📖 Читать
+                                    </button>
+                                    <button class="btn btn-secondary" @click="downloadBook(book)">
                                         📥 Скачать
                                     </button>
                                     <button class="btn btn-secondary" @click="showBookDetails(book)">
-                                        📖 Подробнее
+                                        ℹ️ Подробнее
                                     </button>
                                 </div>
                             </div>
@@ -787,6 +1329,153 @@
                 </div>
             </div>
         </footer>
+
+        </template><!-- /library view -->
+
+        <!-- ==================== READER VIEW ==================== -->
+        <template v-if="currentView === 'reader'">
+
+        <!-- Reader Header -->
+        <header class="reader-header">
+            <div class="container">
+                <div class="reader-header-content">
+                    <button class="reader-back-btn" @click="closeReader">
+                        ← Библиотека
+                    </button>
+                    <div class="reader-book-title">{{ readerBook ? readerBook.title : '' }}</div>
+                    <div class="reader-controls">
+                        <button class="reader-control-btn" @click="readerSidebarOpen = !readerSidebarOpen"
+                                :title="readerSidebarOpen ? 'Скрыть оглавление' : 'Показать оглавление'">
+                            ☰
+                        </button>
+                        <button class="reader-control-btn" @click="readerSettingsOpen = !readerSettingsOpen" title="Настройки">
+                            ⚙
+                        </button>
+                        <button class="reader-control-btn" @click="toggleTheme" :title="themeToggleLabel">
+                            {{ theme === 'dark' ? '🌞' : '🌙' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Panel -->
+        <div class="reader-settings-panel" v-if="readerSettingsOpen" @click.stop>
+            <div class="settings-group">
+                <div class="settings-label">Размер шрифта</div>
+                <div class="settings-row">
+                    <button class="settings-btn" @click="adjustFontSize(-1)">A-</button>
+                    <button class="settings-btn" style="flex:2" disabled>{{ readerFontSize }}%</button>
+                    <button class="settings-btn" @click="adjustFontSize(1)">A+</button>
+                </div>
+            </div>
+            <div class="settings-group">
+                <div class="settings-label">Режим отображения</div>
+                <div class="settings-row">
+                    <button class="settings-btn" :class="{ active: readerMode === 'single' }" @click="setReaderMode('single')">
+                        Страница
+                    </button>
+                    <button class="settings-btn" :class="{ active: readerMode === 'spread' }" @click="setReaderMode('spread')">
+                        Разворот
+                    </button>
+                    <button class="settings-btn" :class="{ active: readerMode === 'scroll' }" @click="setReaderMode('scroll')">
+                        Свиток
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reader Layout -->
+        <div class="reader-layout">
+            <!-- TOC Sidebar -->
+            <aside class="reader-sidebar" :class="{ collapsed: !readerSidebarOpen }">
+                <div class="toc-header">Оглавление</div>
+                <ul class="toc-list">
+                    <li v-for="entry in readerTOC"
+                        :key="entry.section"
+                        class="toc-item"
+                        :class="[
+                            'toc-item-level-' + entry.level,
+                            { active: entry.section === readerSection },
+                            { 'toc-item-notes': entry.body_name }
+                        ]"
+                        @click="goToSection(entry.section)"
+                        :title="entry.title || '(без названия)'">
+                        {{ entry.title || '(без названия)' }}
+                    </li>
+                </ul>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="reader-content-area" @click="readerSettingsOpen = false">
+                <!-- Loading -->
+                <div class="reader-loading" v-if="readerLoading">
+                    <div>
+                        <div class="spinner"></div>
+                        <div>Загрузка...</div>
+                    </div>
+                </div>
+
+                <!-- Single page mode -->
+                <template v-else-if="readerMode === 'single'">
+                    <div class="reader-body" ref="readerBody">
+                        <div class="reader-page-single">
+                            <div class="reader-content" :style="readerFontStyle" v-html="readerHTML"></div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Spread mode (two pages) -->
+                <template v-else-if="readerMode === 'spread'">
+                    <div class="reader-body" ref="readerBody">
+                        <div class="reader-page-spread">
+                            <div class="reader-page-half">
+                                <div class="reader-content" :style="readerFontStyle" v-html="readerHTML"></div>
+                            </div>
+                            <div class="reader-page-half" v-if="readerNextHTML">
+                                <div class="reader-content" :style="readerFontStyle" v-html="readerNextHTML"></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Scroll mode -->
+                <template v-else-if="readerMode === 'scroll'">
+                    <div class="reader-body" ref="readerBody" @scroll="onScrollReaderBody">
+                        <div class="reader-page-scroll">
+                            <div class="scroll-section"
+                                 v-for="sec in readerScrollSections"
+                                 :key="sec.index"
+                                 :data-section="sec.index"
+                                 :ref="'scrollSec' + sec.index">
+                                <div class="reader-content" :style="readerFontStyle" v-html="sec.html"></div>
+                            </div>
+                            <div class="reader-loading" v-if="readerScrollLoading" style="padding:2rem">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Bottom navigation -->
+                <div class="reader-nav" v-if="!readerLoading">
+                    <button class="reader-nav-btn" :disabled="!readerHasPrev" @click="prevSection">
+                        ← Назад
+                    </button>
+                    <div class="reader-progress">
+                        <div>{{ readerSection + 1 }} / {{ readerTotalSections }}</div>
+                        <div class="reader-progress-bar">
+                            <div class="reader-progress-fill" :style="{ width: readerProgressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <button class="reader-nav-btn" :disabled="!readerHasNext" @click="nextSection">
+                        Вперёд →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        </template><!-- /reader view -->
 
         <!-- Book Details Modal -->
         <div class="modal-overlay" v-if="selectedBook" @click="closeModal">
@@ -864,8 +1553,11 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button class="btn btn-primary" @click="downloadBook(selectedBook)">
-                        📥 Скачать книгу
+                    <button class="btn btn-primary" @click="openReader(selectedBook)">
+                        📖 Читать
+                    </button>
+                    <button class="btn btn-secondary" @click="downloadBook(selectedBook)">
+                        📥 Скачать
                     </button>
                     <button class="btn btn-secondary" @click="closeModal">
                         Закрыть
@@ -897,7 +1589,27 @@
                     systemThemeListener: null,
                     escapeKeyHandler: null,
                     genreMap: {},
-                    genresLoaded: false
+                    genresLoaded: false,
+
+                    // Reader state
+                    currentView: 'library',
+                    readerBook: null,
+                    readerTOC: [],
+                    readerTotalSections: 0,
+                    readerSection: 0,
+                    readerHTML: '',
+                    readerNextHTML: '',
+                    readerLoading: false,
+                    readerSidebarOpen: true,
+                    readerSettingsOpen: false,
+                    readerMode: 'single',
+                    readerFontSize: 100,
+                    readerHasPrev: false,
+                    readerHasNext: false,
+                    readerScrollSections: [],
+                    readerScrollLoading: false,
+                    readerScrollLoadedMax: -1,
+                    readerPositionSaveTimer: null
                 };
             },
             computed: {
@@ -937,6 +1649,13 @@
                 },
                 themeToggleLabel() {
                     return this.theme === 'dark' ? '🌞 Светлая тема' : '🌙 Тёмная тема';
+                },
+                readerProgressPercent() {
+                    if (this.readerTotalSections <= 0) return 0;
+                    return Math.round(((this.readerSection + 1) / this.readerTotalSections) * 100);
+                },
+                readerFontStyle() {
+                    return { fontSize: this.readerFontSize + '%' };
                 }
             },
             methods: {
@@ -1221,6 +1940,235 @@
                     }
                 },
 
+                // ===== Reader Methods =====
+
+                async openReader(book) {
+                    if (!book || !book.id) return;
+                    this.readerBook = book;
+                    this.selectedBook = null;
+                    this.readerLoading = true;
+                    this.readerTOC = [];
+                    this.readerHTML = '';
+                    this.readerNextHTML = '';
+                    this.readerSection = 0;
+                    this.readerScrollSections = [];
+                    this.readerScrollLoadedMax = -1;
+                    this.currentView = 'reader';
+
+                    // Restore saved settings
+                    try {
+                        const savedMode = localStorage.getItem('pushkinlib-reader-mode');
+                        if (savedMode) this.readerMode = savedMode;
+                        const savedFont = localStorage.getItem('pushkinlib-reader-font');
+                        if (savedFont) this.readerFontSize = parseInt(savedFont) || 100;
+                    } catch (e) { /* ignore */ }
+
+                    try {
+                        // Load TOC
+                        const tocRes = await axios.get(`${this.apiBase}/books/${book.id}/toc`);
+                        this.readerTOC = tocRes.data.toc || [];
+                        this.readerTotalSections = tocRes.data.total_sections || 0;
+
+                        // Load saved position
+                        try {
+                            const posRes = await axios.get(`${this.apiBase}/books/${book.id}/position`);
+                            if (posRes.data && posRes.data.section > 0) {
+                                this.readerSection = posRes.data.section;
+                            }
+                        } catch (e) { /* no saved position */ }
+
+                        // Load content
+                        await this.loadSection(this.readerSection);
+                    } catch (error) {
+                        console.error('Error opening reader:', error);
+                        alert('Ошибка открытия книги: ' + error.message);
+                        this.closeReader();
+                    }
+                },
+
+                closeReader() {
+                    this.savePosition();
+                    this.currentView = 'library';
+                    this.readerBook = null;
+                    this.readerSettingsOpen = false;
+                    clearTimeout(this.readerPositionSaveTimer);
+                },
+
+                async loadSection(index) {
+                    if (!this.readerBook) return;
+                    this.readerLoading = true;
+
+                    try {
+                        const res = await axios.get(`${this.apiBase}/books/${this.readerBook.id}/content`, {
+                            params: { section: index }
+                        });
+
+                        this.readerSection = index;
+                        this.readerHTML = res.data.html || '';
+                        this.readerHasPrev = res.data.has_prev;
+                        this.readerHasNext = res.data.has_next;
+
+                        // For spread mode, preload next section
+                        if (this.readerMode === 'spread' && res.data.has_next) {
+                            try {
+                                const nextRes = await axios.get(`${this.apiBase}/books/${this.readerBook.id}/content`, {
+                                    params: { section: index + 1 }
+                                });
+                                this.readerNextHTML = nextRes.data.html || '';
+                            } catch (e) {
+                                this.readerNextHTML = '';
+                            }
+                        } else {
+                            this.readerNextHTML = '';
+                        }
+
+                        // For scroll mode, initialize sections
+                        if (this.readerMode === 'scroll') {
+                            this.readerScrollSections = [{ index: index, html: this.readerHTML }];
+                            this.readerScrollLoadedMax = index;
+                        }
+
+                        // Scroll to top
+                        this.$nextTick(() => {
+                            if (this.$refs.readerBody) {
+                                this.$refs.readerBody.scrollTop = 0;
+                            }
+                        });
+
+                        // Auto-save position with debounce
+                        this.debounceSavePosition();
+                    } catch (error) {
+                        console.error('Error loading section:', error);
+                        this.readerHTML = '<p style="color:red">Ошибка загрузки раздела</p>';
+                    } finally {
+                        this.readerLoading = false;
+                    }
+                },
+
+                goToSection(index) {
+                    this.loadSection(index);
+                },
+
+                prevSection() {
+                    if (this.readerMode === 'spread' && this.readerSection >= 2) {
+                        this.loadSection(this.readerSection - 2);
+                    } else if (this.readerSection > 0) {
+                        this.loadSection(this.readerSection - 1);
+                    }
+                },
+
+                nextSection() {
+                    if (this.readerMode === 'spread' && this.readerSection + 2 < this.readerTotalSections) {
+                        this.loadSection(this.readerSection + 2);
+                    } else if (this.readerSection + 1 < this.readerTotalSections) {
+                        this.loadSection(this.readerSection + 1);
+                    }
+                },
+
+                setReaderMode(mode) {
+                    this.readerMode = mode;
+                    try { localStorage.setItem('pushkinlib-reader-mode', mode); } catch(e) {}
+
+                    // Reload content for the new mode
+                    this.loadSection(this.readerSection);
+                },
+
+                adjustFontSize(delta) {
+                    const newSize = this.readerFontSize + delta * 10;
+                    if (newSize >= 70 && newSize <= 200) {
+                        this.readerFontSize = newSize;
+                        try { localStorage.setItem('pushkinlib-reader-font', String(newSize)); } catch(e) {}
+                    }
+                },
+
+                async onScrollReaderBody() {
+                    if (this.readerMode !== 'scroll' || this.readerScrollLoading) return;
+
+                    const body = this.$refs.readerBody;
+                    if (!body) return;
+
+                    // Lazy load next section when near bottom
+                    const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 500;
+                    if (nearBottom && this.readerScrollLoadedMax + 1 < this.readerTotalSections) {
+                        this.readerScrollLoading = true;
+                        const nextIdx = this.readerScrollLoadedMax + 1;
+                        try {
+                            const res = await axios.get(`${this.apiBase}/books/${this.readerBook.id}/content`, {
+                                params: { section: nextIdx }
+                            });
+                            this.readerScrollSections.push({ index: nextIdx, html: res.data.html || '' });
+                            this.readerScrollLoadedMax = nextIdx;
+                            this.readerHasNext = res.data.has_next;
+                        } catch(e) {
+                            console.error('Scroll load error:', e);
+                        } finally {
+                            this.readerScrollLoading = false;
+                        }
+                    }
+
+                    // Update current section based on scroll position
+                    if (this.readerScrollSections.length > 0) {
+                        const bodyRect = body.getBoundingClientRect();
+                        const midY = bodyRect.top + bodyRect.height / 3;
+                        let current = this.readerScrollSections[0].index;
+                        for (const sec of this.readerScrollSections) {
+                            const ref = this.$refs['scrollSec' + sec.index];
+                            if (ref && ref[0]) {
+                                const rect = ref[0].getBoundingClientRect();
+                                if (rect.top <= midY) {
+                                    current = sec.index;
+                                }
+                            }
+                        }
+                        if (current !== this.readerSection) {
+                            this.readerSection = current;
+                            this.debounceSavePosition();
+                        }
+                    }
+                },
+
+                debounceSavePosition() {
+                    clearTimeout(this.readerPositionSaveTimer);
+                    this.readerPositionSaveTimer = setTimeout(() => {
+                        this.savePosition();
+                    }, 2000);
+                },
+
+                async savePosition() {
+                    if (!this.readerBook) return;
+                    try {
+                        await axios.put(`${this.apiBase}/books/${this.readerBook.id}/position`, {
+                            section: this.readerSection,
+                            progress: this.readerTotalSections > 0
+                                ? this.readerSection / this.readerTotalSections
+                                : 0
+                        });
+                    } catch (e) {
+                        console.warn('Failed to save reading position:', e);
+                    }
+                },
+
+                handleReaderKeydown(event) {
+                    if (this.currentView !== 'reader') return;
+
+                    if (event.key === 'Escape') {
+                        if (this.readerSettingsOpen) {
+                            this.readerSettingsOpen = false;
+                        } else {
+                            this.closeReader();
+                        }
+                        return;
+                    }
+
+                    if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+                        event.preventDefault();
+                        this.prevSection();
+                    } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+                        event.preventDefault();
+                        this.nextSection();
+                    }
+                },
+
                 async loadGenreMap() {
                     try {
                         const response = await fetch(`${window.location.origin}/static/genres.csv`, {
@@ -1293,6 +2241,10 @@
 
                 if (typeof document !== 'undefined') {
                     const escapeHandler = (event) => {
+                        if (this.currentView === 'reader') {
+                            this.handleReaderKeydown(event);
+                            return;
+                        }
                         if (event.key === 'Escape' && this.selectedBook) {
                             this.closeModal();
                         }

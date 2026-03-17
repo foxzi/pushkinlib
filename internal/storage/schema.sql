@@ -60,6 +60,15 @@ CREATE INDEX IF NOT EXISTS idx_authors_name ON authors(name);
 CREATE INDEX IF NOT EXISTS idx_genres_name ON genres(name);
 CREATE INDEX IF NOT EXISTS idx_series_name ON series(name);
 
+-- Reading positions table (stores last read position per book)
+CREATE TABLE IF NOT EXISTS reading_positions (
+    book_id TEXT PRIMARY KEY,
+    section INTEGER NOT NULL DEFAULT 0,
+    progress REAL NOT NULL DEFAULT 0.0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+
 -- Full-text search will be implemented later when FTS5 is available
 
 -- Full-text search virtual table
