@@ -19,12 +19,18 @@ services:
       - PAGE_SIZE=30
       - PUBLIC_BASE_URL=http://localhost:9090
       - GENRES_CSV_PATH=./web/static/genres.csv
+      - TTS_SERVER_URL=http://tts-server:8000
+      - TTS_API_KEY=sk-test-key-1
 
     volumes:
       # Mount books directory
       - ./books:/data/books:ro
       # Mount cache directory for database
       - cache_data:/data/cache
+
+    depends_on:
+      tts-server:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
@@ -33,6 +39,27 @@ services:
       retries: 3
       start_period: 40s
 
+  tts-server:
+    image: ghcr.io/foxzi/tts-server:latest
+    container_name: tts-server
+    restart: unless-stopped
+
+    volumes:
+      - tts_models:/models
+      - ./configs/tts-server.yml:/etc/tts-server/config.yml:ro
+
+    environment:
+      - TTS_CONFIG_PATH=/etc/tts-server/config.yml
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
   cache_data:
+    driver: local
+  tts_models:
     driver: local

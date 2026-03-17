@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -381,6 +382,66 @@ func TestSynthesizeSpeech_WhitespaceOnlyInput(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for whitespace-only input, got %d", w.Code)
+	}
+}
+
+func TestSynthesizeSpeech_InputTooLong(t *testing.T) {
+	ts := mockTTSServer(t)
+	defer ts.Close()
+
+	h := setupTestHandlers(t)
+	h.SetTTSConfig(ts.URL, "")
+
+	// Generate input exceeding 5000 chars
+	longInput := ""
+	for i := 0; i < 5100; i++ {
+		longInput += "а"
+	}
+	reqBody := map[string]interface{}{
+		"input": longInput,
+		"voice": "xenia",
+		"model": "v5_ru",
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/api/v1/tts/speech", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.SynthesizeSpeech(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for too-long input, got %d", w.Code)
+	}
+	respBody := w.Body.String()
+	if !strings.Contains(respBody, "too long") {
+		t.Errorf("expected error about 'too long', got: %s", respBody)
+	}
+}
+
+func TestSynthesizeSpeech_InputAtLimit(t *testing.T) {
+	ts := mockTTSServer(t)
+	defer ts.Close()
+
+	h := setupTestHandlers(t)
+	h.SetTTSConfig(ts.URL, "")
+
+	// Generate input exactly at 5000 chars — should succeed
+	input := ""
+	for i := 0; i < 5000; i++ {
+		input += "а"
+	}
+	reqBody := map[string]interface{}{
+		"input": input,
+		"voice": "xenia",
+		"model": "v5_ru",
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/api/v1/tts/speech", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.SynthesizeSpeech(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for input at limit, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

@@ -1775,10 +1775,9 @@
                             ☰
                         </button>
                         <button class="reader-control-btn" v-if="ttsAvailable"
-                                :class="{ active: ttsPlaying }"
+                                :class="{ active: ttsPlaying || ttsLoading }"
                                 @click="toggleTTS"
-                                :disabled="ttsLoading"
-                                :title="ttsPlaying ? 'Остановить озвучку' : 'Озвучить'">
+                                :title="ttsLoading ? 'Остановить загрузку' : (ttsPlaying ? 'Остановить озвучку' : 'Озвучить')">
                             {{ ttsLoading ? '⏳' : (ttsPlaying ? '⏸' : '▶') }}
                         </button>
                         <button class="reader-control-btn" @click="readerSettingsOpen = !readerSettingsOpen" title="Настройки">
@@ -2095,7 +2094,9 @@
                     ttsVoices: [],
                     ttsAudio: null,
                     ttsSettingsOpen: false,
-                    ttsError: ''
+                    ttsError: '',
+                    ttsChunks: [],      // Array of text chunks for current section
+                    ttsChunkIndex: 0    // Current chunk being played
                 };
             },
             computed: {
@@ -2703,7 +2704,7 @@
                 },
 
                 toggleTTS() {
-                    if (this.ttsPlaying) {
+                    if (this.ttsPlaying || this.ttsLoading) {
                         this.stopTTS();
                     } else {
                         this.playSectionTTS(this.readerSection);
@@ -2714,6 +2715,13 @@
                     this.ttsPlaying = false;
                     this.ttsLoading = false;
                     this.ttsError = '';
+                    this.ttsChunks = [];
+                    this.ttsChunkIndex = 0;
+                    // Abort pending TTS request if any
+                    if (this._ttsAbortController) {
+                        this._ttsAbortController.abort();
+                        this._ttsAbortController = null;
+                    }
                     if (this.ttsAudio) {
                         this.ttsAudio.pause();
                         this.ttsAudio.removeAttribute('src');
@@ -2734,35 +2742,67 @@
                         this.ttsAudio.removeAttribute('src');
                     }
 
-                    try {
-                        // Extract plain text from current section HTML
-                        const text = this.extractTextFromHTML(this.readerHTML);
-                        if (!text || text.trim().length === 0) {
-                            // Empty section — skip to next in continuous mode
-                            if (this.ttsContinuous && sectionIndex + 1 < this.readerTotalSections) {
-                                await this.nextSection();
-                                this.$nextTick(() => this.playSectionTTS(this.readerSection));
-                                return;
-                            }
-                            this.stopTTS();
+                    // Split section text into chunks by paragraphs
+                    const chunks = this.splitSectionIntoChunks(this.readerHTML);
+                    if (!chunks || chunks.length === 0) {
+                        // Empty section — skip to next in continuous mode
+                        if (this.ttsContinuous && sectionIndex + 1 < this.readerTotalSections) {
+                            await this.nextSection();
+                            this.$nextTick(() => this.playSectionTTS(this.readerSection));
                             return;
                         }
+                        this.stopTTS();
+                        return;
+                    }
 
-                        // Request audio from TTS proxy
+                    this.ttsChunks = chunks;
+                    this.ttsChunkIndex = 0;
+
+                    // Start playing the first chunk
+                    this.playTTSChunk(sectionIndex);
+                },
+
+                async playTTSChunk(sectionIndex) {
+                    if (!this.ttsPlaying || this.ttsChunkIndex >= this.ttsChunks.length) {
+                        // All chunks played — advance to next section or stop
+                        this.ttsLoading = false;
+                        if (this.ttsContinuous && this.ttsPlaying && sectionIndex + 1 < this.readerTotalSections) {
+                            this.nextSection();
+                            this.$nextTick(() => {
+                                this.playSectionTTS(this.readerSection);
+                            });
+                        } else {
+                            this.ttsPlaying = false;
+                            this.ttsAudio = null;
+                        }
+                        return;
+                    }
+
+                    this.ttsLoading = true;
+                    const chunkText = this.ttsChunks[this.ttsChunkIndex];
+
+                    // Create abort controller for this request
+                    if (this._ttsAbortController) {
+                        this._ttsAbortController.abort();
+                    }
+                    this._ttsAbortController = new AbortController();
+
+                    try {
                         const response = await axios.post(`${this.apiBase}/tts/speech`, {
-                            input: text,
+                            input: chunkText,
                             voice: this.ttsVoice,
                             speed: this.ttsSpeed,
                             model: 'v5_ru',
-                            response_format: 'opus'
+                            response_format: 'mp3'
                         }, {
-                            responseType: 'blob'
+                            responseType: 'blob',
+                            signal: this._ttsAbortController.signal
                         });
 
                         // Check if user stopped while we were loading
                         if (!this.ttsPlaying) return;
 
-                        const audioBlob = new Blob([response.data], { type: 'audio/ogg' });
+                        const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
                         const audioUrl = URL.createObjectURL(audioBlob);
 
                         this.ttsAudio = new Audio(audioUrl);
@@ -2770,28 +2810,26 @@
 
                         this.ttsAudio.onended = () => {
                             URL.revokeObjectURL(audioUrl);
-                            if (this.ttsContinuous && this.ttsPlaying && sectionIndex + 1 < this.readerTotalSections) {
-                                // Continuous mode: advance to next section and play
-                                this.nextSection();
-                                this.$nextTick(() => {
-                                    this.playSectionTTS(this.readerSection);
-                                });
-                            } else {
-                                this.ttsPlaying = false;
-                                this.ttsAudio = null;
-                            }
+                            this.ttsChunkIndex++;
+                            // Play next chunk
+                            this.playTTSChunk(sectionIndex);
                         };
 
                         this.ttsAudio.onerror = (e) => {
                             URL.revokeObjectURL(audioUrl);
                             console.error('TTS audio playback error:', e);
                             this.ttsError = 'Ошибка воспроизведения';
+                            this.ttsLoading = false;
                             this.ttsPlaying = false;
                             this.ttsAudio = null;
                         };
 
-                        this.ttsAudio.play();
+                        await this.ttsAudio.play();
                     } catch (error) {
+                        // Ignore abort errors (user cancelled)
+                        if (error.name === 'AbortError' || (error.code === 'ERR_CANCELED')) {
+                            return;
+                        }
                         console.error('TTS synthesis error:', error);
                         this.ttsLoading = false;
                         if (error.response && error.response.status === 429) {
@@ -2801,6 +2839,75 @@
                         }
                         this.ttsPlaying = false;
                     }
+                },
+
+                /**
+                 * Split section HTML into text chunks suitable for TTS.
+                 * Groups paragraphs into chunks of ~2000 chars max.
+                 */
+                splitSectionIntoChunks(html, maxChunkSize = 2000) {
+                    if (!html) return [];
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    // Remove non-text elements
+                    tmp.querySelectorAll('img, script, style').forEach(el => el.remove());
+
+                    // Collect text from block-level elements (paragraphs, headings, divs)
+                    const paragraphs = [];
+                    const blocks = tmp.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre');
+                    if (blocks.length > 0) {
+                        blocks.forEach(el => {
+                            const text = (el.textContent || '').trim();
+                            if (text.length > 0) paragraphs.push(text);
+                        });
+                    }
+                    // Fallback: if no block elements found, split by newlines
+                    if (paragraphs.length === 0) {
+                        const fullText = (tmp.textContent || tmp.innerText || '').trim();
+                        if (!fullText) return [];
+                        fullText.split(/\n+/).forEach(line => {
+                            const text = line.trim();
+                            if (text.length > 0) paragraphs.push(text);
+                        });
+                    }
+                    if (paragraphs.length === 0) return [];
+
+                    // Group paragraphs into chunks of ~maxChunkSize chars
+                    const chunks = [];
+                    let current = '';
+                    for (const para of paragraphs) {
+                        // If a single paragraph exceeds maxChunkSize, split it by sentences
+                        if (para.length > maxChunkSize) {
+                            if (current.trim()) {
+                                chunks.push(current.trim());
+                                current = '';
+                            }
+                            // Split long paragraph by sentences
+                            const sentences = para.match(/[^.!?]+[.!?]+/g) || [para];
+                            let sentBuf = '';
+                            for (const sent of sentences) {
+                                if (sentBuf.length + sent.length > maxChunkSize && sentBuf.trim()) {
+                                    chunks.push(sentBuf.trim());
+                                    sentBuf = '';
+                                }
+                                sentBuf += sent;
+                            }
+                            if (sentBuf.trim()) {
+                                current = sentBuf;
+                            }
+                            continue;
+                        }
+
+                        if (current.length + para.length + 1 > maxChunkSize && current.trim()) {
+                            chunks.push(current.trim());
+                            current = '';
+                        }
+                        current += (current ? '\n' : '') + para;
+                    }
+                    if (current.trim()) {
+                        chunks.push(current.trim());
+                    }
+                    return chunks;
                 },
 
                 extractTextFromHTML(html) {

@@ -43,16 +43,13 @@ services:
       start_period: 40s
 
   tts-server:
-    build:
-      context: ../../python/tts-server
-      dockerfile: Dockerfile
-    image: tts-server:latest
+    image: ghcr.io/foxzi/tts-server:latest
     container_name: tts-server
     restart: unless-stopped
 
     volumes:
       - tts_models:/models
-      - ../../python/tts-server/config.yml:/etc/tts-server/config.yml:ro
+      - ./configs/tts-server.yml:/etc/tts-server/config.yml:ro
 
     environment:
       - TTS_CONFIG_PATH=/etc/tts-server/config.yml

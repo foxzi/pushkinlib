@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -132,6 +133,13 @@ func (h *Handlers) SynthesizeSpeech(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit input length to prevent extremely long synthesis requests.
+	const maxInputLength = 5000
+	if len([]rune(ttsReq.Input)) > maxInputLength {
+		http.Error(w, fmt.Sprintf("Input text too long (%d chars, max %d)", len([]rune(ttsReq.Input)), maxInputLength), http.StatusBadRequest)
+		return
+	}
+
 	// Set defaults
 	if ttsReq.Model == "" {
 		ttsReq.Model = "v5_ru"
@@ -160,7 +168,14 @@ func (h *Handlers) SynthesizeSpeech(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(r.Context(), "POST", h.tts.ServerURL+"/v1/audio/speech", bytes.NewReader(payload))
+	// Use a detached context with timeout — do NOT use r.Context() here.
+	// r.Context() is canceled when the browser disconnects, which would kill
+	// the upstream TTS request mid-synthesis. TTS synthesis can take 10-30s
+	// for long texts, so we give it a generous timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", h.tts.ServerURL+"/v1/audio/speech", bytes.NewReader(payload))
 	if err != nil {
 		log.Printf("SynthesizeSpeech: failed to create request: %v", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
