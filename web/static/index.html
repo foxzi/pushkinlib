@@ -2743,8 +2743,8 @@
                     }
 
                     // Split section text into chunks by paragraphs
-                    const chunks = this.splitSectionIntoChunks(this.readerHTML);
-                    if (!chunks || chunks.length === 0) {
+                    const result = this.splitSectionIntoChunks(this.readerHTML);
+                    if (!result || !result.chunks || result.chunks.length === 0) {
                         // Empty section — skip to next in continuous mode
                         if (this.ttsContinuous && sectionIndex + 1 < this.readerTotalSections) {
                             await this.nextSection();
@@ -2755,10 +2755,36 @@
                         return;
                     }
 
-                    this.ttsChunks = chunks;
-                    this.ttsChunkIndex = 0;
+                    this.ttsChunks = result.chunks;
 
-                    // Start playing the first chunk
+                    // Find which chunk corresponds to the user's current reading position
+                    const visiblePara = this.getFirstVisibleParagraphIndex();
+                    let startChunk = 0;
+                    for (let i = result.chunkStartPara.length - 1; i >= 0; i--) {
+                        if (result.chunkStartPara[i] <= visiblePara) {
+                            startChunk = i;
+                            break;
+                        }
+                    }
+
+                    // Trim the start chunk: remove paragraphs before the visible one.
+                    // Chunk text is paragraphs joined by '\n'. We need to skip
+                    // (visiblePara - chunkStartPara[startChunk]) paragraphs from the front.
+                    const parasToSkip = visiblePara - result.chunkStartPara[startChunk];
+                    if (parasToSkip > 0) {
+                        const lines = this.ttsChunks[startChunk].split('\n');
+                        if (parasToSkip < lines.length) {
+                            const trimmed = lines.slice(parasToSkip).join('\n').trim();
+                            if (trimmed) {
+                                this.ttsChunks = [...this.ttsChunks]; // clone
+                                this.ttsChunks[startChunk] = trimmed;
+                            }
+                        }
+                    }
+
+                    this.ttsChunkIndex = startChunk;
+
+                    // Start playing from the detected chunk
                     this.playTTSChunk(sectionIndex);
                 },
 
@@ -2842,11 +2868,78 @@
                 },
 
                 /**
+                 * Find the index of the first block-level paragraph whose TOP edge
+                 * is inside the visible part of the reader container.
+                 * This ensures we pick a paragraph the user can actually see
+                 * starting, not one that is mostly scrolled off-screen.
+                 * Uses the same selectors as splitSectionIntoChunks so indices match.
+                 * Returns 0 if nothing is found (safe fallback — start from beginning).
+                 */
+                getFirstVisibleParagraphIndex() {
+                    const container = this.$refs.readerBody;
+                    if (!container) return 0;
+
+                    // Find the .reader-content element for the current section
+                    let content = null;
+                    if (this.readerMode === 'scroll') {
+                        // In scroll mode, find the section element closest to viewport top
+                        const sections = container.querySelectorAll('.scroll-section');
+                        const cRect = container.getBoundingClientRect();
+                        for (const sec of sections) {
+                            if (sec.getBoundingClientRect().bottom > cRect.top) {
+                                content = sec.querySelector('.reader-content');
+                                break;
+                            }
+                        }
+                    } else {
+                        content = container.querySelector('.reader-content');
+                    }
+                    if (!content) return 0;
+
+                    const containerRect = container.getBoundingClientRect();
+                    const blocks = content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre');
+
+                    // Build the same filtered list as splitSectionIntoChunks:
+                    // only blocks with non-empty trimmed textContent.
+                    // Pick the first block whose TOP is inside the container viewport.
+                    // This avoids selecting a paragraph that is mostly scrolled
+                    // above the visible area (only its bottom line is showing).
+                    let paraIndex = 0;
+                    for (const block of blocks) {
+                        const text = (block.textContent || '').trim();
+                        if (text.length === 0) continue; // skip empty — matches split logic
+
+                        const rect = block.getBoundingClientRect();
+                        if (rect.top >= containerRect.top && rect.top < containerRect.bottom) {
+                            return paraIndex;
+                        }
+                        paraIndex++;
+                    }
+                    // Fallback: if no block has its top inside the viewport
+                    // (e.g. one huge paragraph fills the whole screen),
+                    // find the block that overlaps the viewport center.
+                    const centerY = (containerRect.top + containerRect.bottom) / 2;
+                    paraIndex = 0;
+                    for (const block of blocks) {
+                        const text = (block.textContent || '').trim();
+                        if (text.length === 0) continue;
+                        const rect = block.getBoundingClientRect();
+                        if (rect.top <= centerY && rect.bottom >= centerY) {
+                            return paraIndex;
+                        }
+                        paraIndex++;
+                    }
+                    return 0;
+                },
+
+                /**
                  * Split section HTML into text chunks suitable for TTS.
                  * Groups paragraphs into chunks of ~2000 chars max.
+                 * Returns { chunks: string[], chunkStartPara: number[] }
+                 * where chunkStartPara[i] is the paragraph index where chunk i begins.
                  */
                 splitSectionIntoChunks(html, maxChunkSize = 2000) {
-                    if (!html) return [];
+                    if (!html) return { chunks: [], chunkStartPara: [] };
                     const tmp = document.createElement('div');
                     tmp.innerHTML = html;
                     // Remove non-text elements
@@ -2864,50 +2957,63 @@
                     // Fallback: if no block elements found, split by newlines
                     if (paragraphs.length === 0) {
                         const fullText = (tmp.textContent || tmp.innerText || '').trim();
-                        if (!fullText) return [];
+                        if (!fullText) return { chunks: [], chunkStartPara: [] };
                         fullText.split(/\n+/).forEach(line => {
                             const text = line.trim();
                             if (text.length > 0) paragraphs.push(text);
                         });
                     }
-                    if (paragraphs.length === 0) return [];
+                    if (paragraphs.length === 0) return { chunks: [], chunkStartPara: [] };
 
                     // Group paragraphs into chunks of ~maxChunkSize chars
                     const chunks = [];
+                    const chunkStartPara = [];
                     let current = '';
-                    for (const para of paragraphs) {
+                    let currentStartPara = 0;
+                    for (let pi = 0; pi < paragraphs.length; pi++) {
+                        const para = paragraphs[pi];
                         // If a single paragraph exceeds maxChunkSize, split it by sentences
                         if (para.length > maxChunkSize) {
                             if (current.trim()) {
                                 chunks.push(current.trim());
+                                chunkStartPara.push(currentStartPara);
                                 current = '';
                             }
                             // Split long paragraph by sentences
                             const sentences = para.match(/[^.!?]+[.!?]+/g) || [para];
                             let sentBuf = '';
+                            let isFirst = true;
                             for (const sent of sentences) {
                                 if (sentBuf.length + sent.length > maxChunkSize && sentBuf.trim()) {
                                     chunks.push(sentBuf.trim());
+                                    chunkStartPara.push(pi);
                                     sentBuf = '';
+                                    isFirst = false;
                                 }
                                 sentBuf += sent;
                             }
                             if (sentBuf.trim()) {
                                 current = sentBuf;
+                                currentStartPara = pi;
                             }
                             continue;
                         }
 
                         if (current.length + para.length + 1 > maxChunkSize && current.trim()) {
                             chunks.push(current.trim());
+                            chunkStartPara.push(currentStartPara);
                             current = '';
+                        }
+                        if (!current) {
+                            currentStartPara = pi;
                         }
                         current += (current ? '\n' : '') + para;
                     }
                     if (current.trim()) {
                         chunks.push(current.trim());
+                        chunkStartPara.push(currentStartPara);
                     }
-                    return chunks;
+                    return { chunks, chunkStartPara };
                 },
 
                 extractTextFromHTML(html) {
