@@ -998,12 +998,14 @@ func (r *Repository) ClearAllBooks() error {
 // GetReadingPosition returns the saved reading position for a book, or nil if none.
 func (r *Repository) GetReadingPosition(bookID string) (*ReadingPosition, error) {
 	row := r.db.db.QueryRow(
-		"SELECT book_id, section, progress, updated_at FROM reading_positions WHERE book_id = ?",
+		`SELECT book_id, section, progress, total_sections, status, started_at, updated_at
+		 FROM reading_positions WHERE book_id = ?`,
 		bookID,
 	)
 
 	var pos ReadingPosition
-	err := row.Scan(&pos.BookID, &pos.Section, &pos.Progress, &pos.UpdatedAt)
+	err := row.Scan(&pos.BookID, &pos.Section, &pos.Progress,
+		&pos.TotalSections, &pos.Status, &pos.StartedAt, &pos.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -1015,18 +1017,129 @@ func (r *Repository) GetReadingPosition(bookID string) (*ReadingPosition, error)
 }
 
 // SaveReadingPosition saves or updates the reading position for a book.
+// Automatically sets status to "finished" when section reaches the last one.
 func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
+	// Auto-detect finished status
+	status := pos.Status
+	if status == "" {
+		status = "reading"
+	}
+	if pos.TotalSections > 0 && pos.Section >= pos.TotalSections-1 {
+		status = "finished"
+	}
+
 	_, err := r.db.db.Exec(
-		`INSERT INTO reading_positions (book_id, section, progress, updated_at)
-		 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		`INSERT INTO reading_positions (book_id, section, progress, total_sections, status, started_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		 ON CONFLICT(book_id) DO UPDATE SET
 		   section = excluded.section,
 		   progress = excluded.progress,
+		   total_sections = CASE
+		     WHEN excluded.total_sections > 0 THEN excluded.total_sections
+		     ELSE reading_positions.total_sections
+		   END,
+		   status = ?,
 		   updated_at = CURRENT_TIMESTAMP`,
-		pos.BookID, pos.Section, pos.Progress,
+		pos.BookID, pos.Section, pos.Progress, pos.TotalSections, status, status,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save reading position: %w", err)
 	}
 	return nil
+}
+
+// GetReadingHistory returns reading history items (books with reading progress), filtered by status.
+// If status is empty, returns all items. Ordered by updated_at DESC.
+func (r *Repository) GetReadingHistory(status string, limit, offset int) ([]ReadingHistoryItem, int, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Count query
+	countSQL := `SELECT COUNT(*) FROM reading_positions rp
+		JOIN books b ON rp.book_id = b.id`
+	countArgs := make([]interface{}, 0)
+	if status != "" {
+		countSQL += " WHERE rp.status = ?"
+		countArgs = append(countArgs, status)
+	}
+
+	var total int
+	if err := r.db.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count reading history: %w", err)
+	}
+
+	// Data query
+	dataSQL := `SELECT rp.book_id, b.title, b.series_id, b.series_num, b.genre_id,
+		b.format, b.file_size,
+		rp.section, rp.total_sections, rp.status,
+		rp.started_at, rp.updated_at,
+		s.name AS series_name, g.name AS genre_name
+		FROM reading_positions rp
+		JOIN books b ON rp.book_id = b.id
+		LEFT JOIN series s ON b.series_id = s.id
+		LEFT JOIN genres g ON b.genre_id = g.id`
+	dataArgs := make([]interface{}, 0)
+	if status != "" {
+		dataSQL += " WHERE rp.status = ?"
+		dataArgs = append(dataArgs, status)
+	}
+	dataSQL += " ORDER BY rp.updated_at DESC LIMIT ? OFFSET ?"
+	dataArgs = append(dataArgs, limit, offset)
+
+	rows, err := r.db.db.Query(dataSQL, dataArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query reading history: %w", err)
+	}
+	defer rows.Close()
+
+	var items []ReadingHistoryItem
+	for rows.Next() {
+		var item ReadingHistoryItem
+		var seriesID, genreID sql.NullInt64
+		var seriesName, genreName sql.NullString
+
+		if err := rows.Scan(
+			&item.BookID, &item.Title, &seriesID, &item.SeriesNum, &genreID,
+			&item.Format, &item.FileSize,
+			&item.Section, &item.TotalSections, &item.Status,
+			&item.StartedAt, &item.UpdatedAt,
+			&seriesName, &genreName,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan reading history item: %w", err)
+		}
+
+		if seriesID.Valid && seriesName.Valid {
+			item.Series = &Series{ID: int(seriesID.Int64), Name: seriesName.String}
+		}
+		if genreID.Valid && genreName.Valid {
+			item.Genre = &Genre{ID: int(genreID.Int64), Name: genreName.String}
+		}
+
+		// Calculate progress percent
+		if item.TotalSections > 0 {
+			item.ProgressPercent = (item.Section + 1) * 100 / item.TotalSections
+			if item.ProgressPercent > 100 {
+				item.ProgressPercent = 100
+			}
+		}
+
+		// Load authors
+		authors, err := r.getBookAuthors(item.BookID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to load authors for book %s: %w", item.BookID, err)
+		}
+		item.Authors = authors
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating reading history: %w", err)
+	}
+
+	return items, total, nil
 }

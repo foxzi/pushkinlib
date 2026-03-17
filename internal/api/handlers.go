@@ -222,9 +222,19 @@ func (h *Handlers) DownloadBook(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedFileName := book.ID + "." + format
 
+	// Also try zero-padded filename (e.g., "000024.fb2" for book ID "24")
+	var paddedFileName string
+	if _, err := fmt.Sscanf(book.ID, "%d", new(int)); err == nil {
+		paddedFileName = fmt.Sprintf("%06s", book.ID) + "." + format
+	}
+
 	var bookFile *zip.File
 	for _, file := range archive.File {
 		if strings.EqualFold(file.Name, expectedFileName) {
+			bookFile = file
+			break
+		}
+		if paddedFileName != "" && strings.EqualFold(file.Name, paddedFileName) {
 			bookFile = file
 			break
 		}

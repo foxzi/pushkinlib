@@ -1152,6 +1152,238 @@
                 min-width: auto;
             }
         }
+
+        /* ==================== READING HISTORY STYLES ==================== */
+        .reading-history-section {
+            margin-bottom: 2rem;
+        }
+
+        .reading-history-section .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .reading-history-section .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .reading-history-section .section-link {
+            font-size: 0.85rem;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            text-decoration: underline;
+        }
+
+        .history-cards {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .history-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+            padding: 1rem;
+            min-width: 260px;
+            max-width: 320px;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.15s;
+        }
+
+        .history-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .history-card .hc-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-card .hc-authors {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-card .hc-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--secondary-bg);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 0.4rem;
+        }
+
+        .history-card .hc-progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .history-card .hc-progress-fill.finished {
+            background: #10b981;
+        }
+
+        .history-card .hc-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--muted-text);
+        }
+
+        .history-card .hc-status {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 500;
+        }
+
+        .history-card .hc-status.reading {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .history-card .hc-status.finished {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        [data-theme="dark"] .history-card .hc-status.reading {
+            background: #1e3a8a;
+            color: #bfdbfe;
+        }
+
+        [data-theme="dark"] .history-card .hc-status.finished {
+            background: #064e3b;
+            color: #a7f3d0;
+        }
+
+        /* History page */
+        .history-filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .history-filter-bar .filter-btn {
+            padding: 6px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--surface-border);
+            background: var(--surface-color);
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .history-filter-bar .filter-btn.active {
+            background: var(--primary-color);
+            color: var(--button-primary-text);
+            border-color: var(--primary-color);
+        }
+
+        .history-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+        }
+
+        .history-list-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .history-list-card .hlc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .history-list-card .hlc-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .history-list-card .hlc-authors {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+        }
+
+        .history-list-card .hlc-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--secondary-bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .history-list-card .hlc-progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            background: var(--primary-color);
+        }
+
+        .history-list-card .hlc-progress-fill.finished {
+            background: #10b981;
+        }
+
+        .history-list-card .hlc-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-list-card .hlc-meta {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+        }
+
+        .history-list-card .hlc-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-link-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .nav-link-btn:hover {
+            background: var(--secondary-bg);
+        }
     </style>
 </head>
 <body>
@@ -1172,7 +1404,10 @@
                             @input="onSearchInput"
                         >
                     </div>
-                    <div class="theme-toggle">
+                    <div style="display:flex;gap:0.5rem;align-items:center">
+                        <button class="nav-link-btn" @click="showHistoryView" v-if="currentView === 'library'">
+                            📋 История
+                        </button>
                         <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
                             {{ themeToggleLabel }}
                         </button>
@@ -1214,6 +1449,43 @@
                         <button class="filter-chip" type="button" v-if="selectedAuthorFilter && selectedSeriesFilter" @click="clearAllFilters">
                             Сбросить все
                         </button>
+                    </div>
+                </div>
+
+                <!-- Continue Reading section -->
+                <div class="reading-history-section" v-if="!loading && readingNow.length > 0 && !searchQuery && !selectedAuthorFilter && !selectedSeriesFilter">
+                    <div class="section-header">
+                        <span class="section-title">Продолжить чтение</span>
+                        <button class="section-link" @click="showHistoryView">Вся история →</button>
+                    </div>
+                    <div class="history-cards">
+                        <div class="history-card" v-for="item in readingNow" :key="'rn-'+item.book_id" @click="openReaderFromHistory(item)">
+                            <div class="hc-title">{{ item.title }}</div>
+                            <div class="hc-authors" v-if="item.authors && item.authors.length">{{ item.authors.map(a => a.name).join(', ') }}</div>
+                            <div class="hc-progress-bar"><div class="hc-progress-fill" :style="{width: item.progress_percent + '%'}"></div></div>
+                            <div class="hc-meta">
+                                <span>{{ item.progress_percent }}%</span>
+                                <span class="hc-status reading">Читаю</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recently Finished section -->
+                <div class="reading-history-section" v-if="!loading && recentlyFinished.length > 0 && !searchQuery && !selectedAuthorFilter && !selectedSeriesFilter">
+                    <div class="section-header">
+                        <span class="section-title">Прочитано</span>
+                    </div>
+                    <div class="history-cards">
+                        <div class="history-card" v-for="item in recentlyFinished" :key="'rf-'+item.book_id" @click="openReaderFromHistory(item)">
+                            <div class="hc-title">{{ item.title }}</div>
+                            <div class="hc-authors" v-if="item.authors && item.authors.length">{{ item.authors.map(a => a.name).join(', ') }}</div>
+                            <div class="hc-progress-bar"><div class="hc-progress-fill finished" style="width:100%"></div></div>
+                            <div class="hc-meta">
+                                <span>100%</span>
+                                <span class="hc-status finished">Прочитана</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1331,6 +1603,100 @@
         </footer>
 
         </template><!-- /library view -->
+
+        <!-- ==================== HISTORY VIEW ==================== -->
+        <template v-if="currentView === 'history'">
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <button class="nav-link-btn" @click="backToLibrary">← Библиотека</button>
+                    <div class="logo" style="flex:1;text-align:center">📋 История чтения</div>
+                    <div>
+                        <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
+                            {{ themeToggleLabel }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="main">
+            <div class="container">
+                <!-- Filter bar -->
+                <div class="history-filter-bar">
+                    <button class="filter-btn" :class="{ active: historyFilter === '' }" @click="setHistoryFilter('')">Все</button>
+                    <button class="filter-btn" :class="{ active: historyFilter === 'reading' }" @click="setHistoryFilter('reading')">Читаю</button>
+                    <button class="filter-btn" :class="{ active: historyFilter === 'finished' }" @click="setHistoryFilter('finished')">Прочитано</button>
+                </div>
+
+                <div class="loading" v-if="historyLoading">
+                    <div class="spinner"></div>
+                    <div>Загрузка...</div>
+                </div>
+
+                <div class="stats" v-if="!historyLoading && historyTotal > 0" style="margin-bottom:1rem">
+                    <div class="stats-message">
+                        Всего <strong>{{ historyTotal }}</strong>
+                        <template v-if="historyFilter === 'reading'">книг в процессе чтения</template>
+                        <template v-else-if="historyFilter === 'finished'">прочитанных книг</template>
+                        <template v-else>книг в истории</template>
+                    </div>
+                </div>
+
+                <!-- History list -->
+                <div class="history-list" v-if="!historyLoading && historyItems.length > 0">
+                    <div class="history-list-card" v-for="item in historyItems" :key="'hi-'+item.book_id">
+                        <div class="hlc-top">
+                            <div>
+                                <div class="hlc-title">{{ item.title }}</div>
+                                <div class="hlc-authors" v-if="item.authors && item.authors.length">{{ item.authors.map(a => a.name).join(', ') }}</div>
+                            </div>
+                            <span class="hc-status" :class="item.status">{{ item.status === 'finished' ? 'Прочитана' : 'Читаю' }}</span>
+                        </div>
+                        <div class="hlc-progress-bar">
+                            <div class="hlc-progress-fill" :class="{ finished: item.status === 'finished' }" :style="{ width: item.progress_percent + '%' }"></div>
+                        </div>
+                        <div class="hlc-bottom">
+                            <span class="hlc-meta">
+                                {{ item.progress_percent }}%
+                                <template v-if="item.total_sections > 0"> · {{ item.section + 1 }}/{{ item.total_sections }} глав</template>
+                                <template v-if="item.series"> · {{ item.series.name }}</template>
+                            </span>
+                            <div class="hlc-actions">
+                                <button class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem" @click="openReaderFromHistory(item)">
+                                    {{ item.status === 'finished' ? 'Перечитать' : 'Продолжить' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div class="empty-state" v-else-if="!historyLoading">
+                    <div class="empty-icon">📋</div>
+                    <h3>Нет записей</h3>
+                    <p v-if="historyFilter">Нет книг с таким статусом</p>
+                    <p v-else>Вы ещё не открывали ни одной книги</p>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" v-if="historyItems.length > 0 && !historyLoading && historyTotal > historyLimit">
+                    <button class="btn btn-secondary" @click="historyPrevPage" :disabled="historyOffset <= 0">← Предыдущая</button>
+                    <div class="page-info">{{ historyOffset + 1 }}-{{ Math.min(historyOffset + historyLimit, historyTotal) }} из {{ historyTotal }}</div>
+                    <button class="btn btn-secondary" @click="historyNextPage" :disabled="historyOffset + historyLimit >= historyTotal">Следующая →</button>
+                </div>
+            </div>
+        </main>
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-content">
+                    <div>Powered by <strong>Pushkinlib</strong></div>
+                    <div>
+                        <a href="https://github.com/foxzi/pushkinlib" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub Repository</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+        </template><!-- /history view -->
 
         <!-- ==================== READER VIEW ==================== -->
         <template v-if="currentView === 'reader'">
@@ -1609,7 +1975,17 @@
                     readerScrollSections: [],
                     readerScrollLoading: false,
                     readerScrollLoadedMax: -1,
-                    readerPositionSaveTimer: null
+                    readerPositionSaveTimer: null,
+
+                    // Reading history state
+                    readingNow: [],
+                    recentlyFinished: [],
+                    historyItems: [],
+                    historyTotal: 0,
+                    historyFilter: '',
+                    historyLoading: false,
+                    historyOffset: 0,
+                    historyLimit: 30
                 };
             },
             computed: {
@@ -1992,6 +2368,8 @@
                     this.readerBook = null;
                     this.readerSettingsOpen = false;
                     clearTimeout(this.readerPositionSaveTimer);
+                    // Refresh history data after reading
+                    this.$nextTick(() => this.loadReadingHistory());
                 },
 
                 async loadSection(index) {
@@ -2141,11 +2519,89 @@
                             section: this.readerSection,
                             progress: this.readerTotalSections > 0
                                 ? this.readerSection / this.readerTotalSections
-                                : 0
+                                : 0,
+                            total_sections: this.readerTotalSections
                         });
                     } catch (e) {
                         console.warn('Failed to save reading position:', e);
                     }
+                },
+
+                // ==================== READING HISTORY METHODS ====================
+
+                async loadReadingHistory() {
+                    try {
+                        const [readingRes, finishedRes] = await Promise.all([
+                            axios.get(`${this.apiBase}/reading-history`, { params: { status: 'reading', limit: 10 } }),
+                            axios.get(`${this.apiBase}/reading-history`, { params: { status: 'finished', limit: 5 } })
+                        ]);
+                        this.readingNow = readingRes.data.items || [];
+                        this.recentlyFinished = finishedRes.data.items || [];
+                    } catch (e) {
+                        console.warn('Failed to load reading history:', e);
+                    }
+                },
+
+                async loadHistoryPage() {
+                    this.historyLoading = true;
+                    try {
+                        const res = await axios.get(`${this.apiBase}/reading-history`, {
+                            params: {
+                                status: this.historyFilter,
+                                limit: this.historyLimit,
+                                offset: this.historyOffset
+                            }
+                        });
+                        this.historyItems = res.data.items || [];
+                        this.historyTotal = res.data.total || 0;
+                    } catch (e) {
+                        console.error('Failed to load history:', e);
+                    } finally {
+                        this.historyLoading = false;
+                    }
+                },
+
+                showHistoryView() {
+                    this.currentView = 'history';
+                    this.historyOffset = 0;
+                    this.loadHistoryPage();
+                },
+
+                backToLibrary() {
+                    this.currentView = 'library';
+                    this.loadReadingHistory();
+                },
+
+                setHistoryFilter(status) {
+                    this.historyFilter = status;
+                    this.historyOffset = 0;
+                    this.loadHistoryPage();
+                },
+
+                historyPrevPage() {
+                    this.historyOffset = Math.max(0, this.historyOffset - this.historyLimit);
+                    this.loadHistoryPage();
+                    this.scrollToTop();
+                },
+
+                historyNextPage() {
+                    this.historyOffset += this.historyLimit;
+                    this.loadHistoryPage();
+                    this.scrollToTop();
+                },
+
+                openReaderFromHistory(item) {
+                    // Create a minimal book object for openReader
+                    this.openReader({
+                        id: item.book_id,
+                        title: item.title,
+                        authors: item.authors,
+                        series: item.series,
+                        series_num: item.series_num,
+                        genre: item.genre,
+                        format: item.format,
+                        file_size: item.file_size
+                    });
                 },
 
                 handleReaderKeydown(event) {
@@ -2267,6 +2723,7 @@
                 }
 
                 this.loadGenreMap();
+                this.loadReadingHistory();
             },
 
             beforeUnmount() {

@@ -49,6 +49,9 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 		r.Get("/books/{id}/position", handlers.GetReadingPosition)
 		r.Put("/books/{id}/position", handlers.SaveReadingPosition)
 
+		// Reading history
+		r.Get("/reading-history", handlers.GetReadingHistory)
+
 		r.Post("/admin/reindex", handlers.ReindexLibrary)
 	})
 

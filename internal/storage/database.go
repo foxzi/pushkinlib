@@ -62,7 +62,56 @@ func (d *Database) initSchema() error {
 		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
+	if err := d.migrateReadingPositions(); err != nil {
+		return fmt.Errorf("failed to migrate reading_positions: %w", err)
+	}
+
 	return nil
+}
+
+// migrateReadingPositions adds new columns to reading_positions for existing databases.
+func (d *Database) migrateReadingPositions() error {
+	migrations := []struct {
+		column string
+		ddl    string
+	}{
+		{"total_sections", "ALTER TABLE reading_positions ADD COLUMN total_sections INTEGER NOT NULL DEFAULT 0"},
+		{"status", "ALTER TABLE reading_positions ADD COLUMN status TEXT NOT NULL DEFAULT 'reading'"},
+		{"started_at", "ALTER TABLE reading_positions ADD COLUMN started_at DATETIME DEFAULT CURRENT_TIMESTAMP"},
+	}
+
+	for _, m := range migrations {
+		if !d.columnExists("reading_positions", m.column) {
+			if _, err := d.db.Exec(m.ddl); err != nil {
+				return fmt.Errorf("add column %s: %w", m.column, err)
+			}
+		}
+	}
+	return nil
+}
+
+// columnExists checks whether a column exists in a table.
+func (d *Database) columnExists(table, column string) bool {
+	rows, err := d.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull int
+		var dfltValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 // ensureDir creates directory if it doesn't exist

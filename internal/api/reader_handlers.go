@@ -48,9 +48,19 @@ func (h *Handlers) openBookFromArchive(book *storage.Book) (io.ReadCloser, func(
 	}
 	expectedFileName := book.ID + "." + format
 
+	// Also try zero-padded filename (e.g., "000024.fb2" for book ID "24")
+	var paddedFileName string
+	if _, err := fmt.Sscanf(book.ID, "%d", new(int)); err == nil {
+		paddedFileName = fmt.Sprintf("%06s", book.ID) + "." + format
+	}
+
 	var bookFile *zip.File
 	for _, file := range archive.File {
 		if strings.EqualFold(file.Name, expectedFileName) {
+			bookFile = file
+			break
+		}
+		if paddedFileName != "" && strings.EqualFold(file.Name, paddedFileName) {
 			bookFile = file
 			break
 		}
@@ -311,5 +321,37 @@ func (h *Handlers) SaveReadingPosition(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
 		log.Printf("SaveReadingPosition: failed to encode response: %v", err)
+	}
+}
+
+// GetReadingHistory returns the reading history (books with progress).
+// GET /api/v1/reading-history?status=reading&limit=30&offset=0
+func (h *Handlers) GetReadingHistory(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status") // "", "reading", "finished"
+	limit := parseInt(r.URL.Query().Get("limit"), 30)
+	offset := parseInt(r.URL.Query().Get("offset"), 0)
+
+	items, total, err := h.repo.GetReadingHistory(status, limit, offset)
+	if err != nil {
+		log.Printf("GetReadingHistory: error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if items == nil {
+		items = []storage.ReadingHistoryItem{}
+	}
+
+	response := map[string]interface{}{
+		"items":    items,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+		"has_more": offset+limit < total,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("GetReadingHistory: failed to encode response: %v", err)
 	}
 }

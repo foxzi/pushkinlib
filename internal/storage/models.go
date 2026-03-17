@@ -73,10 +73,31 @@ type BookList struct {
 
 // ReadingPosition represents a saved reading position
 type ReadingPosition struct {
-	BookID    string    `json:"book_id" db:"book_id"`
-	Section   int       `json:"section" db:"section"`
-	Progress  float64   `json:"progress" db:"progress"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	BookID        string    `json:"book_id" db:"book_id"`
+	Section       int       `json:"section" db:"section"`
+	Progress      float64   `json:"progress" db:"progress"`
+	TotalSections int       `json:"total_sections" db:"total_sections"`
+	Status        string    `json:"status" db:"status"` // "reading" or "finished"
+	StartedAt     time.Time `json:"started_at" db:"started_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// ReadingHistoryItem represents a book in the reading history with book metadata.
+type ReadingHistoryItem struct {
+	BookID          string   `json:"book_id"`
+	Title           string   `json:"title"`
+	Authors         []Author `json:"authors"`
+	Series          *Series  `json:"series,omitempty"`
+	SeriesNum       int      `json:"series_num,omitempty"`
+	Genre           *Genre   `json:"genre,omitempty"`
+	Format          string   `json:"format"`
+	FileSize        int64    `json:"file_size"`
+	Section         int      `json:"section"`
+	TotalSections   int      `json:"total_sections"`
+	ProgressPercent int      `json:"progress_percent"` // 0-100
+	Status          string   `json:"status"`
+	StartedAt       string   `json:"started_at"`
+	UpdatedAt       string   `json:"updated_at"`
 }
 
 // StringArray is a helper type for JSON arrays in database
