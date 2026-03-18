@@ -23,6 +23,10 @@ type Config struct {
 	GenresCSVPath    string
 	TTSServerURL     string
 	TTSAPIKey        string
+	AuthEnabled      bool
+	SessionSecret    string
+	AdminUser        string
+	AdminPass        string
 }
 
 // LoadConfig loads configuration from environment variables
@@ -44,6 +48,10 @@ func LoadConfig() *Config {
 		GenresCSVPath:    getEnvOrDefault("GENRES_CSV_PATH", "./web/static/genres.csv"),
 		TTSServerURL:     getEnvOrDefault("TTS_SERVER_URL", ""),
 		TTSAPIKey:        getEnvOrDefault("TTS_API_KEY", ""),
+		AuthEnabled:      getEnvBool("AUTH_ENABLED", false),
+		SessionSecret:    getEnvOrDefault("SESSION_SECRET", "pushkinlib-default-secret-change-me"),
+		AdminUser:        getEnvOrDefault("ADMIN_USER", "admin"),
+		AdminPass:        getEnvOrDefault("ADMIN_PASS", ""),
 	}
 }
 

@@ -73,6 +73,7 @@ type BookList struct {
 
 // ReadingPosition represents a saved reading position
 type ReadingPosition struct {
+	UserID        string    `json:"-" db:"user_id"`
 	BookID        string    `json:"book_id" db:"book_id"`
 	Section       int       `json:"section" db:"section"`
 	Progress      float64   `json:"progress" db:"progress"`
@@ -125,4 +126,23 @@ func (sa *StringArray) Scan(value interface{}) error {
 	default:
 		return fmt.Errorf("unsupported type for StringArray: %T", value)
 	}
+}
+
+// User represents a registered user
+type User struct {
+	ID           string    `json:"id" db:"id"`
+	Username     string    `json:"username" db:"username"`
+	PasswordHash string    `json:"-" db:"password_hash"`
+	DisplayName  string    `json:"display_name" db:"display_name"`
+	IsAdmin      bool      `json:"is_admin" db:"is_admin"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// Session represents an active user session
+type Session struct {
+	Token     string    `json:"token" db:"token"`
+	UserID    string    `json:"user_id" db:"user_id"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
 }

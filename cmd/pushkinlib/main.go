@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/piligrim/pushkinlib/internal/api"
+	"github.com/piligrim/pushkinlib/internal/auth"
 	"github.com/piligrim/pushkinlib/internal/config"
 	"github.com/piligrim/pushkinlib/internal/indexer"
 	"github.com/piligrim/pushkinlib/internal/opds"
@@ -62,8 +63,39 @@ func main() {
 		fmt.Printf("Database contains %d books\n", searchResult.Total)
 	}
 
+	// Setup auth middleware
+	authMw := auth.NewMiddleware(repo, cfg.AuthEnabled)
+	if cfg.AuthEnabled {
+		fmt.Println("Authentication: enabled")
+
+		// Create admin user on startup if ADMIN_PASS is set
+		if cfg.AdminPass != "" {
+			count, err := repo.CountUsers()
+			if err != nil {
+				log.Fatalf("Failed to count users: %v", err)
+			}
+			if count == 0 {
+				if _, err := repo.CreateUser(cfg.AdminUser, cfg.AdminPass, cfg.AdminUser, true); err != nil {
+					log.Fatalf("Failed to create admin user: %v", err)
+				}
+				fmt.Printf("Admin user '%s' created\n", cfg.AdminUser)
+			} else {
+				fmt.Printf("Users exist (%d), skipping admin creation\n", count)
+			}
+		} else {
+			fmt.Println("Warning: AUTH_ENABLED=true but ADMIN_PASS is empty, no admin will be created")
+		}
+
+		// Clean expired sessions on startup
+		if err := repo.DeleteExpiredSessions(); err != nil {
+			log.Printf("Warning: failed to clean expired sessions: %v", err)
+		}
+	} else {
+		fmt.Println("Authentication: disabled")
+	}
+
 	// Setup API routes
-	handlers := api.NewHandlers(repo, cfg.BooksDir, cfg.INPXPath)
+	handlers := api.NewHandlers(repo, cfg.BooksDir, cfg.INPXPath, authMw)
 
 	// Configure TTS proxy if TTS_SERVER_URL is set
 	if cfg.TTSServerURL != "" {
@@ -86,7 +118,7 @@ func main() {
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	opdsHandler := opds.NewHandler(repo, baseURL, cfg.CatalogTitle, genreNames)
-	api.SetupOPDSRoutes(router, opdsHandler)
+	api.SetupOPDSRoutes(router, opdsHandler, authMw)
 
 	// Setup HTTP server
 	server := &http.Server{

@@ -61,19 +61,47 @@ CREATE INDEX IF NOT EXISTS idx_genres_name ON genres(name);
 CREATE INDEX IF NOT EXISTS idx_series_name ON series(name);
 
 -- Reading positions table (stores last read position and reading history per book)
+-- NOTE: user_id is empty string when auth is disabled (singleton mode).
+-- Migration from old schema (book_id-only PK) is handled in database.go.
 CREATE TABLE IF NOT EXISTS reading_positions (
-    book_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT '',
+    book_id TEXT NOT NULL,
     section INTEGER NOT NULL DEFAULT 0,
     progress REAL NOT NULL DEFAULT 0.0,
     total_sections INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'reading',
     started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, book_id),
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_reading_positions_status ON reading_positions(status);
 CREATE INDEX IF NOT EXISTS idx_reading_positions_updated ON reading_positions(updated_at);
+CREATE INDEX IF NOT EXISTS idx_reading_positions_user ON reading_positions(user_id);
+
+-- Users table (only used when AUTH_ENABLED=true)
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Sessions table (only used when AUTH_ENABLED=true)
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
 -- Full-text search will be implemented later when FTS5 is available
 

@@ -1,12 +1,19 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-
-const BASE_URL = 'http://localhost:9090';
+const { BASE_URL, isAuthEnabled, loginAsAdmin, gotoAndLogin } = require('./auth-helpers');
 
 test.describe('Reading History Feature', () => {
 
+  // Login via API before each test so page.request calls work with auth
+  test.beforeEach(async ({ request }) => {
+    const enabled = await isAuthEnabled(request);
+    if (enabled) {
+      await loginAsAdmin(request);
+    }
+  });
+
   test('Library loads and shows history button', async ({ page }) => {
-    await page.goto(BASE_URL);
+    await gotoAndLogin(page);
     await page.waitForSelector('.book-card', { timeout: 15000 });
     
     // Check "История" button exists in header (nav-link-btn)
@@ -18,30 +25,24 @@ test.describe('Reading History Feature', () => {
     console.log('PASS: Library loaded, history button visible');
   });
 
-  test('Open book in reader and verify position saving', async ({ page }) => {
+  test('Open book in reader and verify position saving', async ({ page, request }) => {
     // Dismiss any error dialogs that might appear
     page.on('dialog', async dialog => {
       console.log('Dialog:', dialog.message());
       await dialog.accept();
     });
 
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
-
-    // Instead of searching, directly navigate to a book page or use the book we know works
-    // First, save a position via API to ensure the book is tracked
-    await page.request.put(`${BASE_URL}/api/v1/books/100/position`, {
+    // Save a position via API request context (which has auth cookie from beforeEach)
+    await request.put(`${BASE_URL}/api/v1/books/000100/position`, {
       data: {
-        book_id: '100',
         section: 0,
         progress: 0.0,
         total_sections: 22
       }
     });
 
-    // Now click on the history card for book 100 which should appear in "Продолжить чтение"
-    await page.reload();
-    await page.waitForSelector('.book-card', { timeout: 15000 });
+    // Now open the browser and login
+    await gotoAndLogin(page);
     
     // The "Продолжить чтение" block should have a card for book 100
     const historyCard = page.locator('.history-card', { hasText: 'Панаванне' });
@@ -100,19 +101,17 @@ test.describe('Reading History Feature', () => {
     }
   });
 
-  test('Continue Reading block appears on main page after reading', async ({ page }) => {
+  test('Continue Reading block appears on main page after reading', async ({ page, request }) => {
     // First, make sure we have a reading position by calling the API directly
-    await page.request.put(`${BASE_URL}/api/v1/books/100/position`, {
+    await request.put(`${BASE_URL}/api/v1/books/000100/position`, {
       data: {
-        book_id: '100',
         section: 2,
         progress: 0.5,
         total_sections: 22
       }
     });
 
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
+    await gotoAndLogin(page);
 
     // Check "Продолжить чтение" section
     const continueReading = page.locator('text=Продолжить чтение');
@@ -137,8 +136,7 @@ test.describe('Reading History Feature', () => {
   });
 
   test('History page opens with filter tabs', async ({ page }) => {
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
+    await gotoAndLogin(page);
 
     // Click "История" button in header (use specific class to avoid ambiguity)
     const historyBtn = page.locator('.nav-link-btn', { hasText: 'История' });
@@ -184,10 +182,10 @@ test.describe('Reading History Feature', () => {
     }
   });
 
-  test('Auto-finish detection when reaching last section', async ({ page }) => {
+  test('Auto-finish detection when reaching last section', async ({ page, request }) => {
     // Save position at last section to trigger auto-finish
     // Route: PUT /api/v1/books/{id}/position
-    const response = await page.request.put(`${BASE_URL}/api/v1/books/000100/position`, {
+    const response = await request.put(`${BASE_URL}/api/v1/books/000100/position`, {
       data: {
         book_id: '000100',
         section: 21,  // last section (total_sections=22, 0-indexed -> section 21 = last)
@@ -199,7 +197,7 @@ test.describe('Reading History Feature', () => {
     console.log('PASS: Saved position at last section');
 
     // Check via API that status is 'finished'
-    const historyResp = await page.request.get(`${BASE_URL}/api/v1/reading-history?status=finished`);
+    const historyResp = await request.get(`${BASE_URL}/api/v1/reading-history?status=finished`);
     const historyData = await historyResp.json();
     console.log('Finished books:', JSON.stringify(historyData));
     
@@ -210,8 +208,7 @@ test.describe('Reading History Feature', () => {
     console.log('PASS: Book auto-detected as finished with 100% progress');
 
     // Verify on the UI
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
+    await gotoAndLogin(page);
 
     // Check "Прочитано" section on main page
     const finishedSection = page.locator('text=Прочитано');
@@ -219,18 +216,18 @@ test.describe('Reading History Feature', () => {
     console.log('PASS: "Прочитано" section visible on main page');
   });
 
-  test('Reading history API endpoint works with filters', async ({ page }) => {
+  test('Reading history API endpoint works with filters', async ({ request }) => {
     // Test all filters
-    const allResp = await page.request.get(`${BASE_URL}/api/v1/reading-history`);
+    const allResp = await request.get(`${BASE_URL}/api/v1/reading-history`);
     const allData = await allResp.json();
     console.log('All history:', allData.total, 'items');
     expect(allData.total).toBeGreaterThan(0);
 
-    const readingResp = await page.request.get(`${BASE_URL}/api/v1/reading-history?status=reading`);
+    const readingResp = await request.get(`${BASE_URL}/api/v1/reading-history?status=reading`);
     const readingData = await readingResp.json();
     console.log('Reading:', readingData.total, 'items');
 
-    const finishedResp = await page.request.get(`${BASE_URL}/api/v1/reading-history?status=finished`);
+    const finishedResp = await request.get(`${BASE_URL}/api/v1/reading-history?status=finished`);
     const finishedData = await finishedResp.json();
     console.log('Finished:', finishedData.total, 'items');
 
@@ -239,15 +236,15 @@ test.describe('Reading History Feature', () => {
     console.log('PASS: Filter totals add up correctly');
 
     // Test pagination
-    const paginatedResp = await page.request.get(`${BASE_URL}/api/v1/reading-history?limit=1&offset=0`);
+    const paginatedResp = await request.get(`${BASE_URL}/api/v1/reading-history?limit=1&offset=0`);
     const paginatedData = await paginatedResp.json();
     expect(paginatedData.items.length).toBeLessThanOrEqual(1);
     console.log('PASS: Pagination works');
   });
 
-  test('Progress bars display correctly on main page', async ({ page }) => {
+  test('Progress bars display correctly on main page', async ({ page, request }) => {
     // Ensure we have a book being read with some progress
-    await page.request.put(`${BASE_URL}/api/v1/books/200/position`, {
+    await request.put(`${BASE_URL}/api/v1/books/200/position`, {
       data: {
         book_id: '200',
         section: 5,
@@ -256,8 +253,7 @@ test.describe('Reading History Feature', () => {
       }
     });
 
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
+    await gotoAndLogin(page);
 
     // Check that progress bars exist in history cards (class: hc-progress-bar)
     const progressBars = page.locator('.hc-progress-bar');

@@ -1512,10 +1512,147 @@
         .nav-link-btn:hover {
             background: var(--secondary-bg);
         }
+
+        /* Auth / Login */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--background-color);
+        }
+
+        .login-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+
+        .login-card h2 {
+            text-align: center;
+            margin-bottom: 0.25rem;
+            color: var(--text-color);
+            font-size: 1.5rem;
+        }
+
+        .login-card .login-subtitle {
+            text-align: center;
+            color: var(--muted-text);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-card .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .login-card .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+            color: var(--secondary-text);
+        }
+
+        .login-card .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--input-background);
+            color: var(--input-text);
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .login-card .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .login-card .login-error {
+            background: #fef2f2;
+            color: #b91c1c;
+            padding: 0.6rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        [data-theme="dark"] .login-card .login-error {
+            background: rgba(185, 28, 28, 0.15);
+            color: #fca5a5;
+        }
+
+        .login-card .btn-login {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--muted-text);
+        }
+
+        .user-info .username {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: var(--muted-text);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: var(--secondary-bg);
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body>
     <div id="app">
+        <!-- ==================== LOGIN SCREEN ==================== -->
+        <template v-if="authRequired && !authUser">
+        <div class="login-screen">
+            <div class="login-card">
+                <h2>Pushkinlib</h2>
+                <p class="login-subtitle">Войдите для доступа к библиотеке</p>
+                <div v-if="authError" class="login-error">{{ authError }}</div>
+                <form @submit.prevent="doLogin">
+                    <div class="form-group">
+                        <label for="login-user">Имя пользователя</label>
+                        <input id="login-user" class="form-input" type="text" v-model="loginUsername" autocomplete="username" autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-pass">Пароль</label>
+                        <input id="login-pass" class="form-input" type="password" v-model="loginPassword" autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-login" :disabled="authLoading">
+                        {{ authLoading ? 'Вход...' : 'Войти' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+        </template>
+
         <!-- ==================== LIBRARY VIEW ==================== -->
         <template v-if="currentView === 'library'">
         <!-- Header -->
@@ -1534,11 +1671,15 @@
                     </div>
                     <div style="display:flex;gap:0.5rem;align-items:center">
                         <button class="nav-link-btn" @click="showHistoryView" v-if="currentView === 'library'">
-                            📋 История
+                            История
                         </button>
                         <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
                             {{ themeToggleLabel }}
                         </button>
+                        <div v-if="authUser" class="user-info">
+                            <span class="username">{{ authUser.display_name || authUser.username }}</span>
+                            <button class="btn-logout" @click="doLogout" title="Выйти">Выйти</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2123,6 +2264,15 @@
         createApp({
             data() {
                 return {
+                    // Auth state
+                    authRequired: false,
+                    authUser: null,
+                    authLoading: false,
+                    authError: '',
+                    authChecked: false,
+                    loginUsername: '',
+                    loginPassword: '',
+
                     books: [],
                     searchQuery: '',
                     loading: false,
@@ -2242,6 +2392,66 @@
                 }
             },
             methods: {
+                // ---- Auth methods ----
+                async checkAuth() {
+                    try {
+                        const res = await axios.get(`${this.apiBase}/auth/info`);
+                        const authEnabled = res.data.auth_enabled;
+                        if (!authEnabled) {
+                            this.authRequired = false;
+                            this.authChecked = true;
+                            return;
+                        }
+                        this.authRequired = true;
+                        // Try to get current user (session cookie may exist)
+                        try {
+                            const me = await axios.get(`${this.apiBase}/auth/me`);
+                            this.authUser = me.data;
+                        } catch (e) {
+                            this.authUser = null;
+                        }
+                        this.authChecked = true;
+                    } catch (e) {
+                        // If auth/info fails, assume no auth
+                        this.authRequired = false;
+                        this.authChecked = true;
+                    }
+                },
+
+                async doLogin() {
+                    this.authError = '';
+                    this.authLoading = true;
+                    try {
+                        const res = await axios.post(`${this.apiBase}/auth/login`, {
+                            username: this.loginUsername,
+                            password: this.loginPassword
+                        });
+                        this.authUser = res.data.user;
+                        this.loginPassword = '';
+                        // Re-load data after login
+                        this.loadBooks();
+                        this.loadReadingHistory();
+                    } catch (e) {
+                        if (e.response && e.response.status === 401) {
+                            this.authError = 'Неверное имя пользователя или пароль';
+                        } else {
+                            this.authError = 'Ошибка входа. Попробуйте позже.';
+                        }
+                    } finally {
+                        this.authLoading = false;
+                    }
+                },
+
+                async doLogout() {
+                    try {
+                        await axios.post(`${this.apiBase}/auth/logout`);
+                    } catch (e) {
+                        // ignore
+                    }
+                    this.authUser = null;
+                    this.currentView = 'library';
+                },
+
                 async loadBooks() {
                     this.loading = true;
                     try {
@@ -3317,7 +3527,13 @@
             },
 
             mounted() {
-                this.loadBooks();
+                this.checkAuth().then(() => {
+                    if (!this.authRequired || this.authUser) {
+                        this.loadBooks();
+                        this.loadReadingHistory();
+                        this.checkTTSAvailability();
+                    }
+                });
 
                 if (typeof document !== 'undefined') {
                     const escapeHandler = (event) => {
@@ -3347,8 +3563,6 @@
                 }
 
                 this.loadGenreMap();
-                this.loadReadingHistory();
-                this.checkTTSAvailability();
             },
 
             beforeUnmount() {

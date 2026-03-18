@@ -34,34 +34,58 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 		})
 	})
 
+	authMw := handlers.authMw
+
 	// Health check
 	r.Get("/health", handlers.HealthCheck)
 
 	// API routes
 	r.Route("/api/v1", func(r chi.Router) {
+		// Public auth endpoints
+		r.Get("/auth/info", handlers.GetAuthInfo)
+		r.Post("/auth/login", handlers.Login)
+
+		// Auth-protected auth endpoints
+		r.Group(func(r chi.Router) {
+			r.Use(authMw.RequireAuth)
+			r.Post("/auth/logout", handlers.Logout)
+			r.Get("/auth/me", handlers.GetMe)
+		})
+
+		// Public book endpoints (search, details, reader content, images, download)
 		r.Get("/books", handlers.SearchBooks)
 		r.Get("/books/{id}", handlers.GetBookByID)
-
-		// Reader endpoints
 		r.Get("/books/{id}/toc", handlers.GetBookTOC)
 		r.Get("/books/{id}/content", handlers.GetBookContent)
 		r.Get("/books/{id}/image/{name}", handlers.GetBookImage)
-		r.Get("/books/{id}/position", handlers.GetReadingPosition)
-		r.Put("/books/{id}/position", handlers.SaveReadingPosition)
 
-		// Reading history
-		r.Get("/reading-history", handlers.GetReadingHistory)
+		// Reading position and history — require auth when enabled
+		r.Group(func(r chi.Router) {
+			r.Use(authMw.RequireAuth)
+			r.Get("/books/{id}/position", handlers.GetReadingPosition)
+			r.Put("/books/{id}/position", handlers.SaveReadingPosition)
+			r.Get("/reading-history", handlers.GetReadingHistory)
+		})
 
-		// TTS proxy endpoints
+		// TTS proxy endpoints (public — no auth needed)
 		r.Get("/tts/status", handlers.GetTTSStatus)
 		r.Get("/tts/voices", handlers.GetTTSVoices)
 		r.Post("/tts/speech", handlers.SynthesizeSpeech)
 
-		r.Post("/admin/reindex", handlers.ReindexLibrary)
+		// Admin endpoints — require auth + admin role
+		r.Group(func(r chi.Router) {
+			r.Use(authMw.RequireAuth)
+			r.Use(authMw.RequireAdmin)
+			r.Post("/admin/reindex", handlers.ReindexLibrary)
+		})
 	})
 
-	// Admin utility endpoints
-	r.Post("/admin/reindex", handlers.ReindexLibrary)
+	// Legacy admin endpoint (also protected)
+	r.Group(func(r chi.Router) {
+		r.Use(authMw.RequireAuth)
+		r.Use(authMw.RequireAdmin)
+		r.Post("/admin/reindex", handlers.ReindexLibrary)
+	})
 
 	// Serve static files
 	staticDir := "./web/static"

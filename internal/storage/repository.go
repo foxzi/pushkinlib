@@ -996,15 +996,16 @@ func (r *Repository) ClearAllBooks() error {
 }
 
 // GetReadingPosition returns the saved reading position for a book, or nil if none.
-func (r *Repository) GetReadingPosition(bookID string) (*ReadingPosition, error) {
+// userID is empty string when auth is disabled.
+func (r *Repository) GetReadingPosition(userID, bookID string) (*ReadingPosition, error) {
 	row := r.db.db.QueryRow(
-		`SELECT book_id, section, progress, total_sections, status, started_at, updated_at
-		 FROM reading_positions WHERE book_id = ?`,
-		bookID,
+		`SELECT user_id, book_id, section, progress, total_sections, status, started_at, updated_at
+		 FROM reading_positions WHERE user_id = ? AND book_id = ?`,
+		userID, bookID,
 	)
 
 	var pos ReadingPosition
-	err := row.Scan(&pos.BookID, &pos.Section, &pos.Progress,
+	err := row.Scan(&pos.UserID, &pos.BookID, &pos.Section, &pos.Progress,
 		&pos.TotalSections, &pos.Status, &pos.StartedAt, &pos.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1018,6 +1019,7 @@ func (r *Repository) GetReadingPosition(bookID string) (*ReadingPosition, error)
 
 // SaveReadingPosition saves or updates the reading position for a book.
 // Automatically sets status to "finished" when section reaches the last one.
+// pos.UserID must be set (empty string for no-auth mode).
 func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 	// Auto-detect finished status
 	status := pos.Status
@@ -1029,9 +1031,9 @@ func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 	}
 
 	_, err := r.db.db.Exec(
-		`INSERT INTO reading_positions (book_id, section, progress, total_sections, status, started_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		 ON CONFLICT(book_id) DO UPDATE SET
+		`INSERT INTO reading_positions (user_id, book_id, section, progress, total_sections, status, started_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		 ON CONFLICT(user_id, book_id) DO UPDATE SET
 		   section = excluded.section,
 		   progress = excluded.progress,
 		   total_sections = CASE
@@ -1040,7 +1042,7 @@ func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 		   END,
 		   status = ?,
 		   updated_at = CURRENT_TIMESTAMP`,
-		pos.BookID, pos.Section, pos.Progress, pos.TotalSections, status, status,
+		pos.UserID, pos.BookID, pos.Section, pos.Progress, pos.TotalSections, status, status,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save reading position: %w", err)
@@ -1049,8 +1051,9 @@ func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 }
 
 // GetReadingHistory returns reading history items (books with reading progress), filtered by status.
-// If status is empty, returns all items. Ordered by updated_at DESC.
-func (r *Repository) GetReadingHistory(status string, limit, offset int) ([]ReadingHistoryItem, int, error) {
+// If status is empty, returns all items. userID is empty string when auth is disabled.
+// Ordered by updated_at DESC.
+func (r *Repository) GetReadingHistory(userID, status string, limit, offset int) ([]ReadingHistoryItem, int, error) {
 	if limit <= 0 {
 		limit = 30
 	}
@@ -1060,10 +1063,11 @@ func (r *Repository) GetReadingHistory(status string, limit, offset int) ([]Read
 
 	// Count query
 	countSQL := `SELECT COUNT(*) FROM reading_positions rp
-		JOIN books b ON rp.book_id = b.id`
-	countArgs := make([]interface{}, 0)
+		JOIN books b ON rp.book_id = b.id
+		WHERE rp.user_id = ?`
+	countArgs := []interface{}{userID}
 	if status != "" {
-		countSQL += " WHERE rp.status = ?"
+		countSQL += " AND rp.status = ?"
 		countArgs = append(countArgs, status)
 	}
 
@@ -1081,10 +1085,11 @@ func (r *Repository) GetReadingHistory(status string, limit, offset int) ([]Read
 		FROM reading_positions rp
 		JOIN books b ON rp.book_id = b.id
 		LEFT JOIN series s ON b.series_id = s.id
-		LEFT JOIN genres g ON b.genre_id = g.id`
-	dataArgs := make([]interface{}, 0)
+		LEFT JOIN genres g ON b.genre_id = g.id
+		WHERE rp.user_id = ?`
+	dataArgs := []interface{}{userID}
 	if status != "" {
-		dataSQL += " WHERE rp.status = ?"
+		dataSQL += " AND rp.status = ?"
 		dataArgs = append(dataArgs, status)
 	}
 	dataSQL += " ORDER BY rp.updated_at DESC LIMIT ? OFFSET ?"

@@ -1,24 +1,26 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-
-const BASE_URL = 'http://localhost:9090';
+const { BASE_URL, isAuthEnabled, loginAsAdmin, gotoAndLogin } = require('./auth-helpers');
 
 test.describe('TTS Start From Reading Position', () => {
 
-  test('TTS request contains text from visible paragraph, not from beginning', async ({ page }) => {
+  // Login via API before each test so request calls work with auth
+  test.beforeEach(async ({ request }) => {
+    const enabled = await isAuthEnabled(request);
+    if (enabled) {
+      await loginAsAdmin(request);
+    }
+  });
+
+  test('TTS request contains text from visible paragraph, not from beginning', async ({ page, request }) => {
     // Dismiss any error dialogs
     page.on('dialog', async dialog => {
       console.log('Dialog:', dialog.message());
       await dialog.accept();
     });
 
-    // 1. Go to library, open a book
-    await page.goto(BASE_URL);
-    await page.waitForSelector('.book-card', { timeout: 15000 });
-
-    // Save position at section 0 so the book appears in "Продолжить чтение"
-    // and we know it has content
-    await page.request.put(`${BASE_URL}/api/v1/books/000100/position`, {
+    // Save position via API request context (which has auth cookie from beforeEach)
+    await request.put(`${BASE_URL}/api/v1/books/000100/position`, {
       data: {
         book_id: '000100',
         section: 0,
@@ -26,7 +28,9 @@ test.describe('TTS Start From Reading Position', () => {
         total_sections: 22
       }
     });
-    await page.reload();
+
+    // 1. Go to library, open a book
+    await gotoAndLogin(page);
     await page.waitForSelector('.book-card', { timeout: 15000 });
 
     // Click "Читать" on any book — try to open one with content
@@ -196,7 +200,7 @@ test.describe('TTS Start From Reading Position', () => {
   test('TTS starts from beginning when not scrolled', async ({ page }) => {
     page.on('dialog', async dialog => await dialog.accept());
 
-    await page.goto(BASE_URL);
+    await gotoAndLogin(page);
     await page.waitForSelector('.book-card', { timeout: 15000 });
 
     // Open a book

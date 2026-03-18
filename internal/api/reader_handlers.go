@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/piligrim/pushkinlib/internal/auth"
 	"github.com/piligrim/pushkinlib/internal/reader"
 	"github.com/piligrim/pushkinlib/internal/storage"
 )
@@ -275,7 +276,8 @@ func (h *Handlers) GetReadingPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pos, err := h.repo.GetReadingPosition(bookID)
+	userID := auth.UserIDFromContext(r.Context())
+	pos, err := h.repo.GetReadingPosition(userID, bookID)
 	if err != nil {
 		log.Printf("GetReadingPosition: book_id=%s error: %v", bookID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -311,6 +313,7 @@ func (h *Handlers) SaveReadingPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pos.BookID = bookID
+	pos.UserID = auth.UserIDFromContext(r.Context())
 
 	if err := h.repo.SaveReadingPosition(&pos); err != nil {
 		log.Printf("SaveReadingPosition: book_id=%s error: %v", bookID, err)
@@ -331,7 +334,8 @@ func (h *Handlers) GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 30)
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
 
-	items, total, err := h.repo.GetReadingHistory(status, limit, offset)
+	userID := auth.UserIDFromContext(r.Context())
+	items, total, err := h.repo.GetReadingHistory(userID, status, limit, offset)
 	if err != nil {
 		log.Printf("GetReadingHistory: error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

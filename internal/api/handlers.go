@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/piligrim/pushkinlib/internal/auth"
 	"github.com/piligrim/pushkinlib/internal/indexer"
 	"github.com/piligrim/pushkinlib/internal/storage"
 )
@@ -26,15 +27,17 @@ type Handlers struct {
 	inpxPath  string
 	tts       *TTSConfig
 	reindexMu sync.Mutex
+	authMw    *auth.Middleware
 }
 
 // NewHandlers creates new API handlers
-func NewHandlers(repo *storage.Repository, booksDir, inpxPath string) *Handlers {
+func NewHandlers(repo *storage.Repository, booksDir, inpxPath string, authMw *auth.Middleware) *Handlers {
 	return &Handlers{
 		repo:     repo,
 		booksDir: booksDir,
 		inpxPath: inpxPath,
 		tts:      &TTSConfig{},
+		authMw:   authMw,
 	}
 }
 

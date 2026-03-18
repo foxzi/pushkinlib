@@ -2,12 +2,17 @@ package api
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/piligrim/pushkinlib/internal/auth"
 	"github.com/piligrim/pushkinlib/internal/opds"
 )
 
-// SetupOPDSRoutes configures OPDS routes
-func SetupOPDSRoutes(r chi.Router, opdsHandler *opds.Handler) {
+// SetupOPDSRoutes configures OPDS routes with optional BasicAuth protection.
+// When auth is enabled, OPDS clients must authenticate via HTTP Basic Auth.
+func SetupOPDSRoutes(r chi.Router, opdsHandler *opds.Handler, authMw *auth.Middleware) {
 	r.Route("/opds", func(r chi.Router) {
+		// Apply BasicAuth middleware for OPDS clients (e-readers)
+		r.Use(authMw.RequireBasicAuth)
+
 		// Root catalog
 		r.Get("/", opdsHandler.Root)
 

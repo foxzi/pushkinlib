@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/piligrim/pushkinlib/internal/auth"
 	"github.com/piligrim/pushkinlib/internal/inpx"
 	"github.com/piligrim/pushkinlib/internal/storage"
 )
@@ -48,7 +49,7 @@ func setupTestHandlers(t *testing.T) *Handlers {
 		t.Fatalf("failed to insert test book: %v", err)
 	}
 
-	return NewHandlers(repo, t.TempDir(), "")
+	return NewHandlers(repo, t.TempDir(), "", auth.NewMiddleware(repo, false))
 }
 
 // TestSearchBooks_LimitCapped verifies that limit parameter is capped at maxLimit (#11).
@@ -202,7 +203,7 @@ func TestDownloadBook_PathTraversal(t *testing.T) {
 	}
 
 	booksDir := t.TempDir()
-	h := NewHandlers(repo, booksDir, "")
+	h := NewHandlers(repo, booksDir, "", auth.NewMiddleware(repo, false))
 
 	req := httptest.NewRequest("GET", "/download/evil-001", nil)
 	w := httptest.NewRecorder()
@@ -247,7 +248,7 @@ func TestDownloadBook_ArchiveNotFound(t *testing.T) {
 	}
 
 	booksDir := t.TempDir()
-	h := NewHandlers(repo, booksDir, "")
+	h := NewHandlers(repo, booksDir, "", auth.NewMiddleware(repo, false))
 
 	req := httptest.NewRequest("GET", "/download/missing-001", nil)
 	w := httptest.NewRecorder()

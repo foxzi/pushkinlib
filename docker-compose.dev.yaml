@@ -24,6 +24,10 @@ services:
       - GENRES_CSV_PATH=./web/static/genres.csv
       - TTS_SERVER_URL=http://tts-server:8000
       - TTS_API_KEY=sk-test-key-1
+      - AUTH_ENABLED=false
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin123
+      - SESSION_SECRET=dev-session-secret-change-in-production
 
     volumes:
       # Mount books directory
