@@ -3288,11 +3288,11 @@
                     }
                 },
 
-                nextSection() {
+                async nextSection() {
                     if (this.readerMode === 'spread' && this.readerSection + 2 < this.readerTotalSections) {
-                        this.loadSection(this.readerSection + 2);
+                        await this.loadSection(this.readerSection + 2);
                     } else if (this.readerSection + 1 < this.readerTotalSections) {
-                        this.loadSection(this.readerSection + 1);
+                        await this.loadSection(this.readerSection + 1);
                     }
                 },
 
@@ -3541,7 +3541,8 @@
                         // Empty section — skip to next in continuous mode
                         if (this.ttsContinuous && sectionIndex + 1 < this.readerTotalSections) {
                             await this.nextSection();
-                            this.$nextTick(() => this.playSectionTTS(this.readerSection));
+                            await this.$nextTick();
+                            this.playSectionTTS(this.readerSection);
                             return;
                         }
                         this.stopTTS();
@@ -3676,10 +3677,10 @@
                         this._ttsPrefetchedBlob = null;
                         this._ttsPrefetchIndex = -1;
                         if (this.ttsContinuous && this.ttsPlaying && sectionIndex + 1 < this.readerTotalSections) {
-                            this.nextSection();
-                            this.$nextTick(() => {
-                                this.playSectionTTS(this.readerSection);
-                            });
+                            await this.nextSection();
+                            // Wait for DOM to update with new section content
+                            await this.$nextTick();
+                            this.playSectionTTS(this.readerSection);
                         } else {
                             this.ttsPlaying = false;
                             this.ttsAudio = null;
@@ -3732,11 +3733,11 @@
                         // Start prefetching the NEXT chunk while this one plays
                         this.prefetchNextChunk(sectionIndex);
 
-                        this.ttsAudio.onended = () => {
+                        this.ttsAudio.onended = async () => {
                             URL.revokeObjectURL(audioUrl);
                             this.ttsChunkIndex++;
-                            // Play next chunk
-                            this.playTTSChunk(sectionIndex);
+                            // Play next chunk (may await nextSection at end of chapter)
+                            await this.playTTSChunk(sectionIndex);
                         };
 
                         this.ttsAudio.onerror = (e) => {
