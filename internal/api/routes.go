@@ -77,6 +77,10 @@ func SetupRoutes(handlers *Handlers) *chi.Mux {
 			r.Use(authMw.RequireAuth)
 			r.Use(authMw.RequireAdmin)
 			r.Post("/admin/reindex", handlers.ReindexLibrary)
+			r.Get("/admin/users", handlers.ListUsers)
+			r.Post("/admin/users", handlers.CreateUser)
+			r.Delete("/admin/users/{id}", handlers.DeleteUser)
+			r.Put("/admin/users/{id}/password", handlers.UpdateUserPassword)
 		})
 	})
 

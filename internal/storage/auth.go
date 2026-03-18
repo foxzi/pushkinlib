@@ -178,6 +178,68 @@ func (r *Repository) CountUsers() (int, error) {
 	return count, nil
 }
 
+// ListUsers returns all users ordered by creation date.
+func (r *Repository) ListUsers() ([]User, error) {
+	rows, err := r.db.db.Query(
+		`SELECT id, username, password_hash, display_name, is_admin, created_at, updated_at
+		 FROM users ORDER BY created_at ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		var isAdmin int
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName,
+			&isAdmin, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		user.IsAdmin = isAdmin != 0
+		users = append(users, user)
+	}
+	return users, rows.Err()
+}
+
+// DeleteUser deletes a user and all their sessions by user ID.
+func (r *Repository) DeleteUser(id string) error {
+	// Delete sessions first
+	if _, err := r.db.db.Exec("DELETE FROM sessions WHERE user_id = ?", id); err != nil {
+		return fmt.Errorf("delete user sessions: %w", err)
+	}
+	result, err := r.db.db.Exec("DELETE FROM users WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// UpdateUserPassword updates a user's password (bcrypt hash).
+func (r *Repository) UpdateUserPassword(id, newPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	result, err := r.db.db.Exec(
+		"UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+		string(hash), time.Now(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("update user password: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
 // generateID generates a random hex ID for users.
 func generateID() (string, error) {
 	b := make([]byte, 16)

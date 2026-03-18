@@ -138,7 +138,36 @@ Admin user "admin" created successfully
 
 Сессия хранится в httpOnly cookie и действует 30 дней.
 
-#### Шаг 5. Настройте читалку (OPDS)
+#### Шаг 5. Создайте дополнительных пользователей
+
+В шапке сайта нажмите **Пользователи** (кнопка видна только администраторам).
+
+В админ-панели можно:
+- **Создать** пользователя — заполните логин, пароль (от 6 символов), опционально отображаемое имя и флаг «Администратор»
+- **Удалить** пользователя (кроме самого себя)
+- **Сменить пароль** любому пользователю
+
+Те же операции доступны через API:
+
+```bash
+# Список пользователей
+curl -b cookies.txt http://localhost:9090/api/v1/admin/users
+
+# Создание пользователя
+curl -b cookies.txt -X POST http://localhost:9090/api/v1/admin/users \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"secret123","display_name":"Алиса"}'
+
+# Смена пароля
+curl -b cookies.txt -X PUT http://localhost:9090/api/v1/admin/users/{id}/password \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"newpass789"}'
+
+# Удаление пользователя
+curl -b cookies.txt -X DELETE http://localhost:9090/api/v1/admin/users/{id}
+```
+
+#### Шаг 6. Настройте читалку (OPDS)
 
 При включённой авторизации OPDS-каталог требует HTTP Basic Auth. В настройках вашей читалки:
 
@@ -170,6 +199,7 @@ Admin user "admin" created successfully
 | История чтения | Открыта (общая) | Требует логина (привязана к пользователю) |
 | OPDS-каталог | Открыт | HTTP Basic Auth |
 | Переиндексация (`/api/v1/admin/reindex`) | Открыта | Только администратор |
+| Управление пользователями (`/api/v1/admin/users`) | — | Только администратор |
 
 ### Отключение авторизации
 
@@ -426,6 +456,36 @@ curl -X POST http://localhost:9090/api/v1/admin/reindex -b "session=<token>"
 ```
 
 В ответе возвращается статистика: количество импортированных книг, название коллекции и время выполнения в миллисекундах.
+
+### Управление пользователями (API)
+
+Все эндпоинты требуют авторизации с правами администратора.
+
+```http
+GET    /api/v1/admin/users              # Список пользователей
+POST   /api/v1/admin/users              # Создать пользователя
+DELETE /api/v1/admin/users/{id}          # Удалить пользователя
+PUT    /api/v1/admin/users/{id}/password # Сменить пароль пользователя
+```
+
+Создание пользователя (`POST`):
+
+```json
+{
+  "username": "alice",
+  "password": "secret123",
+  "display_name": "Алиса",
+  "is_admin": false
+}
+```
+
+Смена пароля (`PUT`):
+
+```json
+{
+  "password": "newpass789"
+}
+```
 
 ### Поиск книг (публичный)
 ```http

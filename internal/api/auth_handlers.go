@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/piligrim/pushkinlib/internal/auth"
 )
 
@@ -115,6 +116,169 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
 		log.Printf("Logout: failed to encode response: %v", err)
+	}
+}
+
+// ListUsers returns all users (admin only).
+// GET /api/v1/admin/users
+func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.repo.ListUsers()
+	if err != nil {
+		log.Printf("ListUsers: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	type userResponse struct {
+		ID          string `json:"id"`
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+		IsAdmin     bool   `json:"is_admin"`
+		CreatedAt   string `json:"created_at"`
+	}
+	result := make([]userResponse, 0, len(users))
+	for _, u := range users {
+		result = append(result, userResponse{
+			ID:          u.ID,
+			Username:    u.Username,
+			DisplayName: u.DisplayName,
+			IsAdmin:     u.IsAdmin,
+			CreatedAt:   u.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Printf("ListUsers: failed to encode response: %v", err)
+	}
+}
+
+// CreateUser creates a new user (admin only).
+// POST /api/v1/admin/users
+func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username    string `json:"username"`
+		Password    string `json:"password"`
+		DisplayName string `json:"display_name"`
+		IsAdmin     bool   `json:"is_admin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "Имя пользователя и пароль обязательны", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		http.Error(w, "Пароль должен быть не менее 6 символов", http.StatusBadRequest)
+		return
+	}
+
+	// Check if username already exists
+	existing, err := h.repo.GetUserByUsername(req.Username)
+	if err != nil {
+		log.Printf("CreateUser: check existing user: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		http.Error(w, "Пользователь с таким именем уже существует", http.StatusConflict)
+		return
+	}
+
+	displayName := req.DisplayName
+	if displayName == "" {
+		displayName = req.Username
+	}
+
+	user, err := h.repo.CreateUser(req.Username, req.Password, displayName, req.IsAdmin)
+	if err != nil {
+		log.Printf("CreateUser: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":           user.ID,
+		"username":     user.Username,
+		"display_name": user.DisplayName,
+		"is_admin":     user.IsAdmin,
+		"created_at":   user.CreatedAt.Format(time.RFC3339),
+	}); err != nil {
+		log.Printf("CreateUser: failed to encode response: %v", err)
+	}
+}
+
+// DeleteUser deletes a user (admin only, cannot delete yourself).
+// DELETE /api/v1/admin/users/{id}
+func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Prevent self-deletion
+	currentUser := auth.UserFromContext(r.Context())
+	if currentUser != nil && currentUser.ID == userID {
+		http.Error(w, "Нельзя удалить самого себя", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.DeleteUser(userID); err != nil {
+		if err.Error() == "user not found" {
+			http.Error(w, "Пользователь не найден", http.StatusNotFound)
+			return
+		}
+		log.Printf("DeleteUser: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Printf("DeleteUser: failed to encode response: %v", err)
+	}
+}
+
+// UpdateUserPassword changes a user's password (admin only).
+// PUT /api/v1/admin/users/{id}/password
+func (h *Handlers) UpdateUserPassword(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		http.Error(w, "Пароль должен быть не менее 6 символов", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.UpdateUserPassword(userID, req.Password); err != nil {
+		if err.Error() == "user not found" {
+			http.Error(w, "Пользователь не найден", http.StatusNotFound)
+			return
+		}
+		log.Printf("UpdateUserPassword: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Printf("UpdateUserPassword: failed to encode response: %v", err)
 	}
 }
 

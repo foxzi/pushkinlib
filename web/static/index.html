@@ -1625,6 +1625,173 @@
             background: var(--secondary-bg);
             color: var(--text-color);
         }
+
+        /* Admin panel */
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .admin-table th, .admin-table td {
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .admin-table th {
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--muted-text);
+        }
+        .admin-table td {
+            font-size: 0.9rem;
+        }
+        .admin-table .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .admin-table .badge-admin {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        [data-theme="dark"] .admin-table .badge-admin {
+            background: #1b3a1b;
+            color: #66bb6a;
+        }
+        .admin-table .badge-user {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        [data-theme="dark"] .admin-table .badge-user {
+            background: #0d2744;
+            color: #42a5f5;
+        }
+        .admin-actions {
+            display: flex;
+            gap: 0.4rem;
+        }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--secondary-bg);
+            color: var(--text-color);
+            transition: background 0.2s;
+        }
+        .btn-sm:hover {
+            background: var(--border-color);
+        }
+        .btn-sm.btn-danger {
+            color: #d32f2f;
+            border-color: #d32f2f;
+            background: transparent;
+        }
+        .btn-sm.btn-danger:hover {
+            background: #d32f2f;
+            color: #fff;
+        }
+        .admin-form {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-top: 1rem;
+            max-width: 500px;
+        }
+        .admin-form h3 {
+            margin: 0 0 1rem 0;
+            font-size: 1rem;
+        }
+        .admin-form .form-row {
+            display: flex;
+            gap: 0.8rem;
+            margin-bottom: 0.8rem;
+            align-items: end;
+        }
+        .admin-form .form-row .form-group {
+            flex: 1;
+        }
+        .admin-form .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: var(--muted-text);
+        }
+        .admin-form .form-input {
+            width: 100%;
+            padding: 0.5rem 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+        .admin-form .form-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.8rem;
+        }
+        .admin-form .form-checkbox label {
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .admin-form .btn-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .admin-alert {
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .admin-alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        [data-theme="dark"] .admin-alert-success {
+            background: #1b3a1b;
+            color: #66bb6a;
+        }
+        .admin-alert-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        [data-theme="dark"] .admin-alert-error {
+            background: #3e1111;
+            color: #ef5350;
+        }
+
+        /* Password change modal overlay */
+        .admin-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .admin-modal {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+            min-width: 340px;
+            max-width: 90vw;
+        }
+        .admin-modal h3 {
+            margin: 0 0 1rem 0;
+        }
     </style>
 </head>
 <body>
@@ -1672,6 +1839,9 @@
                     <div style="display:flex;gap:0.5rem;align-items:center">
                         <button class="nav-link-btn" @click="showHistoryView" v-if="currentView === 'library'">
                             История
+                        </button>
+                        <button class="nav-link-btn" @click="showAdminView" v-if="authUser && authUser.is_admin">
+                            Пользователи
                         </button>
                         <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
                             {{ themeToggleLabel }}
@@ -1966,6 +2136,109 @@
             </div>
         </footer>
         </template><!-- /history view -->
+
+        <!-- ==================== ADMIN VIEW ==================== -->
+        <template v-if="currentView === 'admin'">
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <button class="nav-link-btn" @click="backToLibrary">← Библиотека</button>
+                    <div class="logo" style="flex:1;text-align:center">Управление пользователями</div>
+                    <div>
+                        <button class="btn btn-secondary theme-toggle-btn" @click="toggleTheme">
+                            {{ themeToggleLabel }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="main">
+            <div class="container">
+                <div v-if="adminMessage" class="admin-alert" :class="adminMessageType === 'success' ? 'admin-alert-success' : 'admin-alert-error'">
+                    {{ adminMessage }}
+                </div>
+
+                <!-- Create user form -->
+                <div class="admin-form">
+                    <h3>Новый пользователь</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Имя пользователя</label>
+                            <input class="form-input" type="text" v-model="adminNewUsername" placeholder="login">
+                        </div>
+                        <div class="form-group">
+                            <label>Отображаемое имя</label>
+                            <input class="form-input" type="text" v-model="adminNewDisplayName" placeholder="Имя Фамилия">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Пароль</label>
+                            <input class="form-input" type="password" v-model="adminNewPassword" placeholder="Минимум 6 символов">
+                        </div>
+                    </div>
+                    <div class="form-checkbox">
+                        <input type="checkbox" id="admin-is-admin" v-model="adminNewIsAdmin">
+                        <label for="admin-is-admin">Администратор</label>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" @click="adminCreateUser" :disabled="adminLoading">Создать</button>
+                    </div>
+                </div>
+
+                <!-- User list -->
+                <div class="loading" v-if="adminLoading && adminUsers.length === 0">
+                    <div class="spinner"></div>
+                    <div>Загрузка...</div>
+                </div>
+
+                <table class="admin-table" v-if="adminUsers.length > 0">
+                    <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Отображаемое имя</th>
+                            <th>Роль</th>
+                            <th>Создан</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="u in adminUsers" :key="u.id">
+                            <td>{{ u.username }}</td>
+                            <td>{{ u.display_name }}</td>
+                            <td>
+                                <span class="badge" :class="u.is_admin ? 'badge-admin' : 'badge-user'">
+                                    {{ u.is_admin ? 'Админ' : 'Пользователь' }}
+                                </span>
+                            </td>
+                            <td>{{ formatAdminDate(u.created_at) }}</td>
+                            <td class="admin-actions">
+                                <button class="btn-sm" @click="adminStartPasswordChange(u)" title="Сменить пароль">Пароль</button>
+                                <button class="btn-sm btn-danger" @click="adminDeleteUser(u)" title="Удалить"
+                                        v-if="u.id !== authUser.id" :disabled="adminLoading">Удалить</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Password change modal -->
+                <div v-if="adminPasswordUser" class="admin-modal-overlay" @click.self="adminPasswordUser = null">
+                    <div class="admin-modal">
+                        <h3>Сменить пароль: {{ adminPasswordUser.username }}</h3>
+                        <div class="form-group" style="margin-bottom:1rem">
+                            <label style="display:block;font-size:0.8rem;color:var(--muted-text);margin-bottom:0.3rem">Новый пароль</label>
+                            <input class="form-input" type="password" v-model="adminPasswordValue" placeholder="Минимум 6 символов"
+                                   style="width:100%;box-sizing:border-box">
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-primary" @click="adminChangePassword" :disabled="adminLoading">Сохранить</button>
+                            <button class="btn btn-secondary" @click="adminPasswordUser = null">Отмена</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        </template><!-- /admin view -->
 
         <!-- ==================== READER VIEW ==================== -->
         <template v-if="currentView === 'reader'">
@@ -2337,7 +2610,19 @@
                     // TTS sleep timer
                     ttsTimerMinutes: 30, // User-selected timer duration in minutes
                     ttsTimerRemaining: 0, // Seconds remaining (0 = timer not running)
-                    ttsTimerInterval: null // setInterval handle
+                    ttsTimerInterval: null, // setInterval handle
+
+                    // Admin panel state
+                    adminUsers: [],
+                    adminLoading: false,
+                    adminMessage: '',
+                    adminMessageType: '',
+                    adminNewUsername: '',
+                    adminNewDisplayName: '',
+                    adminNewPassword: '',
+                    adminNewIsAdmin: false,
+                    adminPasswordUser: null,
+                    adminPasswordValue: ''
                 };
             },
             computed: {
@@ -2450,6 +2735,113 @@
                     }
                     this.authUser = null;
                     this.currentView = 'library';
+                },
+
+                // ---- Admin methods ----
+                showAdminView() {
+                    this.currentView = 'admin';
+                    this.adminMessage = '';
+                    this.adminLoadUsers();
+                },
+
+                async adminLoadUsers() {
+                    this.adminLoading = true;
+                    try {
+                        const res = await axios.get(`${this.apiBase}/admin/users`);
+                        this.adminUsers = res.data;
+                    } catch (e) {
+                        this.adminMessage = 'Ошибка загрузки списка пользователей';
+                        this.adminMessageType = 'error';
+                    } finally {
+                        this.adminLoading = false;
+                    }
+                },
+
+                async adminCreateUser() {
+                    if (!this.adminNewUsername || !this.adminNewPassword) {
+                        this.adminMessage = 'Имя пользователя и пароль обязательны';
+                        this.adminMessageType = 'error';
+                        return;
+                    }
+                    if (this.adminNewPassword.length < 6) {
+                        this.adminMessage = 'Пароль должен быть не менее 6 символов';
+                        this.adminMessageType = 'error';
+                        return;
+                    }
+                    this.adminLoading = true;
+                    this.adminMessage = '';
+                    try {
+                        await axios.post(`${this.apiBase}/admin/users`, {
+                            username: this.adminNewUsername,
+                            password: this.adminNewPassword,
+                            display_name: this.adminNewDisplayName,
+                            is_admin: this.adminNewIsAdmin
+                        });
+                        this.adminNewUsername = '';
+                        this.adminNewPassword = '';
+                        this.adminNewDisplayName = '';
+                        this.adminNewIsAdmin = false;
+                        this.adminMessage = 'Пользователь создан';
+                        this.adminMessageType = 'success';
+                        await this.adminLoadUsers();
+                    } catch (e) {
+                        this.adminMessage = (e.response && e.response.data) ? e.response.data : 'Ошибка создания пользователя';
+                        this.adminMessageType = 'error';
+                    } finally {
+                        this.adminLoading = false;
+                    }
+                },
+
+                async adminDeleteUser(user) {
+                    if (!confirm(`Удалить пользователя "${user.username}"?`)) return;
+                    this.adminLoading = true;
+                    this.adminMessage = '';
+                    try {
+                        await axios.delete(`${this.apiBase}/admin/users/${user.id}`);
+                        this.adminMessage = `Пользователь "${user.username}" удалён`;
+                        this.adminMessageType = 'success';
+                        await this.adminLoadUsers();
+                    } catch (e) {
+                        this.adminMessage = (e.response && e.response.data) ? e.response.data : 'Ошибка удаления';
+                        this.adminMessageType = 'error';
+                    } finally {
+                        this.adminLoading = false;
+                    }
+                },
+
+                adminStartPasswordChange(user) {
+                    this.adminPasswordUser = user;
+                    this.adminPasswordValue = '';
+                },
+
+                async adminChangePassword() {
+                    if (this.adminPasswordValue.length < 6) {
+                        this.adminMessage = 'Пароль должен быть не менее 6 символов';
+                        this.adminMessageType = 'error';
+                        return;
+                    }
+                    this.adminLoading = true;
+                    this.adminMessage = '';
+                    try {
+                        await axios.put(`${this.apiBase}/admin/users/${this.adminPasswordUser.id}/password`, {
+                            password: this.adminPasswordValue
+                        });
+                        this.adminMessage = `Пароль пользователя "${this.adminPasswordUser.username}" изменён`;
+                        this.adminMessageType = 'success';
+                        this.adminPasswordUser = null;
+                        this.adminPasswordValue = '';
+                    } catch (e) {
+                        this.adminMessage = (e.response && e.response.data) ? e.response.data : 'Ошибка смены пароля';
+                        this.adminMessageType = 'error';
+                    } finally {
+                        this.adminLoading = false;
+                    }
+                },
+
+                formatAdminDate(dateStr) {
+                    if (!dateStr) return '';
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
                 },
 
                 async loadBooks() {
