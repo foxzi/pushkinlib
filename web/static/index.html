@@ -1405,6 +1405,32 @@
             color: #a7f3d0;
         }
 
+        .history-card .hc-actions {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+        }
+
+        .hc-action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 28px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            background: var(--secondary-bg);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s, transform 0.15s;
+            padding: 0;
+        }
+
+        .hc-action-btn:hover {
+            background: var(--secondary-bg-hover);
+            transform: scale(1.1);
+        }
+
         /* History page */
         .history-filter-bar {
             display: flex;
@@ -1906,6 +1932,10 @@
                                 <span>{{ item.progress_percent }}%</span>
                                 <span class="hc-status reading">Читаю</span>
                             </div>
+                            <div class="hc-actions">
+                                <button class="hc-action-btn" @click.stop="downloadHistoryBook(item)" title="Скачать">📥</button>
+                                <button class="hc-action-btn" @click.stop="showHistoryBookDetails(item)" title="Подробнее">ℹ️</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1923,6 +1953,10 @@
                             <div class="hc-meta">
                                 <span>100%</span>
                                 <span class="hc-status finished">Прочитана</span>
+                            </div>
+                            <div class="hc-actions">
+                                <button class="hc-action-btn" @click.stop="downloadHistoryBook(item)" title="Скачать">📥</button>
+                                <button class="hc-action-btn" @click.stop="showHistoryBookDetails(item)" title="Подробнее">ℹ️</button>
                             </div>
                         </div>
                     </div>
@@ -2104,6 +2138,12 @@
                                 <button class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem" @click="openReaderFromHistory(item)">
                                     {{ item.status === 'finished' ? 'Перечитать' : 'Продолжить' }}
                                 </button>
+                                <button class="btn btn-secondary" style="padding:4px 12px;font-size:0.8rem" @click="downloadHistoryBook(item)">
+                                    📥 Скачать
+                                </button>
+                                <button class="btn btn-secondary" style="padding:4px 12px;font-size:0.8rem" @click="showHistoryBookDetails(item)">
+                                    ℹ️ Подробнее
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2255,6 +2295,12 @@
                         <button class="reader-control-btn" @click="readerSidebarOpen = !readerSidebarOpen"
                                 :title="readerSidebarOpen ? 'Скрыть оглавление' : 'Показать оглавление'">
                             ☰
+                        </button>
+                        <button class="reader-control-btn" @click="downloadBook(readerBook)" title="Скачать книгу">
+                            📥
+                        </button>
+                        <button class="reader-control-btn" @click="showBookDetails(readerBook)" title="Подробнее о книге">
+                            ℹ️
                         </button>
                         <button class="reader-control-btn" v-if="ttsAvailable"
                                 :class="{ active: ttsPlaying || ttsLoading }"
@@ -3990,9 +4036,8 @@
                     this.scrollToTop();
                 },
 
-                openReaderFromHistory(item) {
-                    // Create a minimal book object for openReader
-                    this.openReader({
+                historyItemToBook(item) {
+                    return {
                         id: item.book_id,
                         title: item.title,
                         authors: item.authors,
@@ -4001,7 +4046,19 @@
                         genre: item.genre,
                         format: item.format,
                         file_size: item.file_size
-                    });
+                    };
+                },
+
+                openReaderFromHistory(item) {
+                    this.openReader(this.historyItemToBook(item));
+                },
+
+                downloadHistoryBook(item) {
+                    this.downloadBook(this.historyItemToBook(item));
+                },
+
+                showHistoryBookDetails(item) {
+                    this.showBookDetails(this.historyItemToBook(item));
                 },
 
                 handleReaderKeydown(event) {
