@@ -722,6 +722,10 @@
             margin-left: -300px;
         }
 
+        .sidebar-overlay {
+            display: none;
+        }
+
         .toc-header {
             padding: 1rem;
             font-weight: 600;
@@ -1157,6 +1161,55 @@
             50% { opacity: 0.3; }
         }
 
+        /* TTS sleep timer */
+        .tts-timer-countdown {
+            font-size: 0.75rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--primary-color);
+            margin-left: 0.25rem;
+            white-space: nowrap;
+        }
+
+        .tts-timer-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tts-timer-input {
+            width: 4rem;
+            padding: 0.3rem 0.4rem;
+            border: 1px solid var(--surface-border);
+            border-radius: 4px;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .tts-timer-btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.75rem;
+            border: 1px solid var(--surface-border);
+            border-radius: 4px;
+            background: var(--secondary-bg);
+            color: var(--button-secondary-text);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .tts-timer-btn:hover {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        .tts-timer-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
         .reader-control-btn.active {
             color: var(--primary-color);
         }
@@ -1177,12 +1230,27 @@
                 left: 0;
                 top: 60px;
                 bottom: 0;
+                width: min(300px, 85vw);
+                min-width: auto;
                 z-index: 150;
                 box-shadow: 4px 0 16px rgba(0,0,0,0.2);
+                transition: transform 0.3s ease;
             }
 
             .reader-sidebar.collapsed {
-                margin-left: -300px;
+                transform: translateX(-100%);
+                margin-left: 0;
+            }
+
+            .sidebar-overlay {
+                display: block;
+                position: fixed;
+                left: 0;
+                right: 0;
+                top: 60px;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.4);
+                z-index: 149;
             }
 
             .reader-page-spread {
@@ -1780,6 +1848,10 @@
                                 :title="ttsLoading ? 'Остановить загрузку' : (ttsPlaying ? 'Остановить озвучку' : 'Озвучить')">
                             {{ ttsLoading ? '⏳' : (ttsPlaying ? '⏸' : '▶') }}
                         </button>
+                        <span v-if="ttsTimerRemaining > 0" class="tts-timer-countdown"
+                              title="Таймер сна">
+                            {{ ttsTimerDisplay }}
+                        </span>
                         <button class="reader-control-btn" @click="readerSettingsOpen = !readerSettingsOpen" title="Настройки">
                             ⚙
                         </button>
@@ -1840,12 +1912,27 @@
                         </label>
                     </div>
                 </div>
+                <div class="settings-group">
+                    <div class="settings-label">Таймер сна (мин)</div>
+                    <div class="tts-timer-row">
+                        <input type="number" class="tts-timer-input" min="1" max="999"
+                               v-model.number="ttsTimerMinutes" @change="saveTTSSettings"
+                               :disabled="ttsTimerRemaining > 0">
+                        <button class="tts-timer-btn" :class="{ active: ttsTimerRemaining > 0 }"
+                                @click="ttsTimerRemaining > 0 ? stopTTSTimer() : startTTSTimer()">
+                            {{ ttsTimerRemaining > 0 ? 'Сбросить' : 'Запустить' }}
+                        </button>
+                    </div>
+                </div>
             </template>
         </div>
 
         <!-- Reader Layout -->
         <div class="reader-layout">
             <!-- TOC Sidebar -->
+            <div class="sidebar-overlay"
+                 v-if="readerSidebarOpen"
+                 @click="readerSidebarOpen = false"></div>
             <aside class="reader-sidebar" :class="{ collapsed: !readerSidebarOpen }">
                 <div class="toc-header">Оглавление</div>
                 <ul class="toc-list">
@@ -2063,7 +2150,7 @@
                     readerHTML: '',
                     readerNextHTML: '',
                     readerLoading: false,
-                    readerSidebarOpen: true,
+                    readerSidebarOpen: window.innerWidth > 768,
                     readerSettingsOpen: false,
                     readerMode: 'single',
                     readerFontSize: 100,
@@ -2096,10 +2183,19 @@
                     ttsSettingsOpen: false,
                     ttsError: '',
                     ttsChunks: [],      // Array of text chunks for current section
-                    ttsChunkIndex: 0    // Current chunk being played
+                    ttsChunkIndex: 0,   // Current chunk being played
+                    // TTS sleep timer
+                    ttsTimerMinutes: 30, // User-selected timer duration in minutes
+                    ttsTimerRemaining: 0, // Seconds remaining (0 = timer not running)
+                    ttsTimerInterval: null // setInterval handle
                 };
             },
             computed: {
+                ttsTimerDisplay() {
+                    const m = Math.floor(this.ttsTimerRemaining / 60);
+                    const s = this.ttsTimerRemaining % 60;
+                    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                },
                 totalPages() {
                     return Math.ceil(this.totalBooks / this.pageSize);
                 },
@@ -2440,6 +2536,7 @@
                     this.readerSection = 0;
                     this.readerScrollSections = [];
                     this.readerScrollLoadedMax = -1;
+                    this.readerSidebarOpen = window.innerWidth > 768;
                     this.currentView = 'reader';
 
                     // Restore saved settings
@@ -2537,6 +2634,9 @@
 
                 goToSection(index) {
                     this.loadSection(index);
+                    if (window.innerWidth <= 768) {
+                        this.readerSidebarOpen = false;
+                    }
                 },
 
                 prevSection() {
@@ -2689,6 +2789,7 @@
                             if (s.voice) this.ttsVoice = s.voice;
                             if (s.speed) this.ttsSpeed = s.speed;
                             if (s.continuous !== undefined) this.ttsContinuous = s.continuous;
+                            if (s.timerMinutes > 0) this.ttsTimerMinutes = s.timerMinutes;
                         }
                     } catch (e) { /* ignore */ }
                 },
@@ -2698,9 +2799,33 @@
                         localStorage.setItem('pushkinlib-tts-settings', JSON.stringify({
                             voice: this.ttsVoice,
                             speed: this.ttsSpeed,
-                            continuous: this.ttsContinuous
+                            continuous: this.ttsContinuous,
+                            timerMinutes: this.ttsTimerMinutes
                         }));
                     } catch (e) { /* ignore */ }
+                },
+
+                startTTSTimer() {
+                    this.stopTTSTimer();
+                    const minutes = Math.max(1, Math.round(this.ttsTimerMinutes || 30));
+                    this.ttsTimerMinutes = minutes;
+                    this.ttsTimerRemaining = minutes * 60;
+                    this.ttsTimerInterval = setInterval(() => {
+                        this.ttsTimerRemaining--;
+                        if (this.ttsTimerRemaining <= 0) {
+                            this.stopTTSTimer();
+                            this.stopTTS();
+                        }
+                    }, 1000);
+                    this.saveTTSSettings();
+                },
+
+                stopTTSTimer() {
+                    if (this.ttsTimerInterval) {
+                        clearInterval(this.ttsTimerInterval);
+                        this.ttsTimerInterval = null;
+                    }
+                    this.ttsTimerRemaining = 0;
                 },
 
                 toggleTTS() {
@@ -2717,6 +2842,7 @@
                     this.ttsError = '';
                     this.ttsChunks = [];
                     this.ttsChunkIndex = 0;
+                    this.stopTTSTimer();
                     // Abort pending TTS request if any
                     if (this._ttsAbortController) {
                         this._ttsAbortController.abort();
@@ -3233,6 +3359,8 @@
                 if (this.escapeKeyHandler) {
                     document.removeEventListener('keydown', this.escapeKeyHandler);
                 }
+
+                this.stopTTSTimer();
             }
         }).mount('#app');
     </script>
