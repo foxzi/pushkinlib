@@ -22,34 +22,34 @@ Web-сервис для просмотра локальной библиотек
 ### Запуск через Docker Compose (рекомендуется)
 
 ```bash
-# Создайте директорию для книг
-mkdir -p books
+# Скопируйте пример конфигурации
+cp .env.example .env
 
-# Поместите туда ваши книги и INPX файл (например, books/index.inpx)
+# Отредактируйте .env — укажите путь к библиотеке и имя INPX файла
+nano .env
+```
 
+В `.env` задаются пути к библиотеке и основные параметры:
+
+```env
+# Путь на хосте к папке с книгами (монтируется в контейнер)
+LIBRARY_PATH=./books
+
+# Имя файла индекса INPX внутри папки с книгами
+INPX_FILE=test_library.inpx
+```
+
+Docker Compose автоматически подхватывает `.env` файл и подставляет переменные.
+
+```bash
 # Запустите контейнер
-docker compose up -d
+docker compose -f docker-compose.dev.yaml up -d --build
 ```
 
 Сервис будет доступен по адресу http://localhost:9090:
 - **Web интерфейс**: http://localhost:9090/
 - **API**: http://localhost:9090/api/v1/books
 - **OPDS каталог**: http://localhost:9090/opds
-
-Основная конфигурация через переменные окружения в `docker-compose.yaml`:
-```yaml
-environment:
-  - PORT=9090
-  - BOOKS_DIR=/data/books
-  - INPX_PATH=/data/books/index.inpx
-  - CATALOG_TITLE=Pushkinlib Library
-  - PUBLIC_BASE_URL=http://localhost:9090
-```
-
-> Для разработки используйте `docker-compose.dev.yaml`, который собирает образ локально:
-> ```bash
-> docker compose -f docker-compose.dev.yaml up -d
-> ```
 
 ## Аутентификация
 
@@ -183,10 +183,19 @@ curl -b cookies.txt -X DELETE http://localhost:9090/api/v1/admin/users/{id}
 
 | Переменная | По умолчанию | Описание |
 |---|---|---|
+| `LIBRARY_PATH` | `./books` | Путь на хосте к папке с книгами (для Docker, монтируется в контейнер) |
+| `INPX_FILE` | `test_library.inpx` | Имя файла индекса INPX внутри папки с книгами |
+| `PORT` | `9090` | Порт веб-сервера |
+| `CATALOG_TITLE` | `Pushkinlib` | Название каталога |
+| `PAGE_SIZE` | `30` | Количество книг на странице |
+| `LOG_LEVEL` | `info` | Уровень логирования |
+| `PUBLIC_BASE_URL` | `http://localhost:9090` | Публичный URL (для OPDS ссылок) |
 | `AUTH_ENABLED` | `false` | Включить авторизацию. При `false` все маршруты открыты, история общая |
 | `ADMIN_USER` | `admin` | Логин администратора. Создаётся автоматически при первом запуске |
 | `ADMIN_PASS` | — | Пароль администратора. **Обязателен** при `AUTH_ENABLED=true` |
 | `SESSION_SECRET` | *(автогенерация)* | Секрет для подписи сессий. Без явного значения сессии сбрасываются при перезапуске |
+| `TTS_SERVER_URL` | — | URL TTS-сервера (например, `http://tts-server:8000`) |
+| `TTS_API_KEY` | — | API-ключ для TTS-сервера (опционально) |
 
 ### Что защищено, а что нет
 
@@ -241,12 +250,13 @@ cp .env.example .env
 
 Основные параметры в `.env`:
 ```env
+# Путь к библиотеке (при локальном запуске — без Docker)
+LIBRARY_PATH=./books
+INPX_FILE=my_catalog.inpx
+
 PORT=9090
-BOOKS_DIR=/path/to/books
-INPX_PATH=/path/to/catalog.inpx
 CATALOG_TITLE=Моя библиотека
 PUBLIC_BASE_URL=http://localhost:9090
-GENRES_CSV_PATH=./web/static/genres.csv
 
 # Авторизация (опционально)
 AUTH_ENABLED=false

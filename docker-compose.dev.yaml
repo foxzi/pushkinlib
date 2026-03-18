@@ -11,27 +11,26 @@ services:
       - "9090:9090"
 
     environment:
-      - PORT=9090
+      - PORT=${PORT:-9090}
       - BOOKS_DIR=/data/books
-      - INPX_PATH=/data/books/test_library.inpx
+      - INPX_PATH=/data/books/${INPX_FILE:-test_library.inpx}
       - CACHE_DIR=/data/cache
       - DATABASE_PATH=/data/cache/pushkinlib.db
-      - CATALOG_TITLE=Pushkinlib Docker Library
-      - BASIC_AUTH_ENABLED=false
-      - LOG_LEVEL=info
-      - PAGE_SIZE=30
-      - PUBLIC_BASE_URL=http://localhost:9090
+      - CATALOG_TITLE=${CATALOG_TITLE:-Pushkinlib}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PAGE_SIZE=${PAGE_SIZE:-30}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:9090}
       - GENRES_CSV_PATH=./web/static/genres.csv
       - TTS_SERVER_URL=http://tts-server:8000
-      - TTS_API_KEY=sk-test-key-1
-      - AUTH_ENABLED=false
-      - ADMIN_USER=admin
-      - ADMIN_PASS=admin123
-      - SESSION_SECRET=dev-session-secret-change-in-production
+      - TTS_API_KEY=${TTS_API_KEY:-sk-test-key-1}
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - SESSION_SECRET=${SESSION_SECRET:-dev-session-secret-change-in-production}
 
     volumes:
-      # Mount books directory
-      - ./books:/data/books:ro
+      # Mount books directory (LIBRARY_PATH from .env)
+      - ${LIBRARY_PATH:-./books}:/data/books:ro
       # Mount cache directory for database
       - cache_data:/data/cache
 
@@ -51,12 +50,40 @@ services:
     container_name: tts-server
     restart: unless-stopped
 
+    entrypoint:
+      - python
+      - -c
+      - |
+        import os, pathlib, textwrap
+        key = os.environ.get("TTS_API_KEY", "changeme")
+        cfg = textwrap.dedent(f"""\
+        preload_models: "v5_ru"
+        models_dir: /models
+        default_sample_rate: 48000
+        torch_threads: 4
+        max_concurrent: 2
+        default_response_format: opus
+
+        auth:
+          enabled: true
+          tokens:
+            - key: "{key}"
+              name: "pushkinlib"
+              requests_per_minute: 120
+              chars_per_hour: 500000
+        """)
+        conf = pathlib.Path("/etc/tts-server/config.yml")
+        conf.parent.mkdir(parents=True, exist_ok=True)
+        conf.write_text(cfg)
+        print(f"TTS config generated (auth key: {key[:8]}...)")
+        os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"])
+
     volumes:
       - tts_models:/models
-      - ./configs/tts-server.yml:/etc/tts-server/config.yml:ro
 
     environment:
       - TTS_CONFIG_PATH=/etc/tts-server/config.yml
+      - TTS_API_KEY=${TTS_API_KEY:-sk-test-key-1}
 
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
