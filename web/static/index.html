@@ -4083,16 +4083,28 @@
                     };
                 },
 
-                openReaderFromHistory(item) {
-                    this.openReader(this.historyItemToBook(item));
+                async openReaderFromHistory(item) {
+                    try {
+                        const res = await axios.get(`${this.apiBase}/books/${item.book_id}`);
+                        this.openReader(res.data);
+                    } catch (e) {
+                        console.warn('Failed to load full book data, using history data:', e);
+                        this.openReader(this.historyItemToBook(item));
+                    }
                 },
 
                 downloadHistoryBook(item) {
                     this.downloadBook(this.historyItemToBook(item));
                 },
 
-                showHistoryBookDetails(item) {
-                    this.showBookDetails(this.historyItemToBook(item));
+                async showHistoryBookDetails(item) {
+                    try {
+                        const res = await axios.get(`${this.apiBase}/books/${item.book_id}`);
+                        this.showBookDetails(res.data);
+                    } catch (e) {
+                        console.warn('Failed to load book details, using history data:', e);
+                        this.showBookDetails(this.historyItemToBook(item));
+                    }
                 },
 
                 handleReaderKeydown(event) {
