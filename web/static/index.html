@@ -1411,6 +1411,17 @@
             margin-top: 0.5rem;
         }
 
+        .hc-book-meta {
+            margin-bottom: 0.4rem;
+            margin-top: 0.2rem;
+            gap: 0.3rem;
+        }
+
+        .hc-book-meta .meta-tag {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.4rem;
+        }
+
         .hc-action-btn {
             display: inline-flex;
             align-items: center;
@@ -1927,6 +1938,14 @@
                         <div class="history-card" v-for="item in readingNow" :key="'rn-'+item.book_id" @click="openReaderFromHistory(item)">
                             <div class="hc-title">{{ item.title }}</div>
                             <div class="hc-authors" v-if="item.authors && item.authors.length">{{ item.authors.map(a => a.name).join(', ') }}</div>
+                            <div class="book-meta hc-book-meta" v-if="item.series || item.genre || item.format || item.file_size">
+                                <span class="meta-tag" v-if="item.series">📚 {{ item.series.name }}<span v-if="item.series_num"> #{{ item.series_num }}</span></span>
+                                <template v-if="item.genre">
+                                    <span class="meta-tag" v-for="g in parseGenres(item.genre.name)" :key="'rn-g-'+item.book_id+'-'+g">🏷️ {{ readableGenre(g) }}</span>
+                                </template>
+                                <span class="meta-tag" v-if="item.format">📄 {{ item.format.toUpperCase() }}</span>
+                                <span class="meta-tag" v-if="item.file_size">💾 {{ formatFileSize(item.file_size) }}</span>
+                            </div>
                             <div class="hc-progress-bar"><div class="hc-progress-fill" :style="{width: item.progress_percent + '%'}"></div></div>
                             <div class="hc-meta">
                                 <span>{{ item.progress_percent }}%</span>
@@ -1949,6 +1968,14 @@
                         <div class="history-card" v-for="item in recentlyFinished" :key="'rf-'+item.book_id" @click="openReaderFromHistory(item)">
                             <div class="hc-title">{{ item.title }}</div>
                             <div class="hc-authors" v-if="item.authors && item.authors.length">{{ item.authors.map(a => a.name).join(', ') }}</div>
+                            <div class="book-meta hc-book-meta" v-if="item.series || item.genre || item.format || item.file_size">
+                                <span class="meta-tag" v-if="item.series">📚 {{ item.series.name }}<span v-if="item.series_num"> #{{ item.series_num }}</span></span>
+                                <template v-if="item.genre">
+                                    <span class="meta-tag" v-for="g in parseGenres(item.genre.name)" :key="'rf-g-'+item.book_id+'-'+g">🏷️ {{ readableGenre(g) }}</span>
+                                </template>
+                                <span class="meta-tag" v-if="item.format">📄 {{ item.format.toUpperCase() }}</span>
+                                <span class="meta-tag" v-if="item.file_size">💾 {{ formatFileSize(item.file_size) }}</span>
+                            </div>
                             <div class="hc-progress-bar"><div class="hc-progress-fill finished" style="width:100%"></div></div>
                             <div class="hc-meta">
                                 <span>100%</span>
@@ -2125,6 +2152,14 @@
                             </div>
                             <span class="hc-status" :class="item.status">{{ item.status === 'finished' ? 'Прочитана' : 'Читаю' }}</span>
                         </div>
+                        <div class="book-meta hc-book-meta" v-if="item.series || item.genre || item.format || item.file_size">
+                            <span class="meta-tag" v-if="item.series">📚 {{ item.series.name }}<span v-if="item.series_num"> #{{ item.series_num }}</span></span>
+                            <template v-if="item.genre">
+                                <span class="meta-tag" v-for="g in parseGenres(item.genre.name)" :key="'hi-g-'+item.book_id+'-'+g">🏷️ {{ readableGenre(g) }}</span>
+                            </template>
+                            <span class="meta-tag" v-if="item.format">📄 {{ item.format.toUpperCase() }}</span>
+                            <span class="meta-tag" v-if="item.file_size">💾 {{ formatFileSize(item.file_size) }}</span>
+                        </div>
                         <div class="hlc-progress-bar">
                             <div class="hlc-progress-fill" :class="{ finished: item.status === 'finished' }" :style="{ width: item.progress_percent + '%' }"></div>
                         </div>
@@ -2132,7 +2167,6 @@
                             <span class="hlc-meta">
                                 {{ item.progress_percent }}%
                                 <template v-if="item.total_sections > 0"> · {{ item.section + 1 }}/{{ item.total_sections }} глав</template>
-                                <template v-if="item.series"> · {{ item.series.name }}</template>
                             </span>
                             <div class="hlc-actions">
                                 <button class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem" @click="openReaderFromHistory(item)">
