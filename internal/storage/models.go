@@ -73,14 +73,15 @@ type BookList struct {
 
 // ReadingPosition represents a saved reading position
 type ReadingPosition struct {
-	UserID        string    `json:"-" db:"user_id"`
-	BookID        string    `json:"book_id" db:"book_id"`
-	Section       int       `json:"section" db:"section"`
-	Progress      float64   `json:"progress" db:"progress"`
-	TotalSections int       `json:"total_sections" db:"total_sections"`
-	Status        string    `json:"status" db:"status"` // "reading" or "finished"
-	StartedAt     time.Time `json:"started_at" db:"started_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	UserID         string    `json:"-" db:"user_id"`
+	BookID         string    `json:"book_id" db:"book_id"`
+	Section        int       `json:"section" db:"section"`
+	ScrollPosition float64   `json:"scroll_position" db:"scroll_position"` // 0.0–1.0 within section
+	Progress       float64   `json:"progress" db:"progress"`
+	TotalSections  int       `json:"total_sections" db:"total_sections"`
+	Status         string    `json:"status" db:"status"` // "reading" or "finished"
+	StartedAt      time.Time `json:"started_at" db:"started_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // ReadingHistoryItem represents a book in the reading history with book metadata.

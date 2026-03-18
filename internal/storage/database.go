@@ -86,6 +86,7 @@ func (d *Database) migrateReadingPositions() error {
 		{"total_sections", "ALTER TABLE reading_positions ADD COLUMN total_sections INTEGER NOT NULL DEFAULT 0"},
 		{"status", "ALTER TABLE reading_positions ADD COLUMN status TEXT NOT NULL DEFAULT 'reading'"},
 		{"started_at", "ALTER TABLE reading_positions ADD COLUMN started_at DATETIME DEFAULT CURRENT_TIMESTAMP"},
+		{"scroll_position", "ALTER TABLE reading_positions ADD COLUMN scroll_position REAL NOT NULL DEFAULT 0.0"},
 	}
 
 	for _, m := range migrations {
@@ -125,6 +126,7 @@ func (d *Database) migrateReadingPositionsPK() error {
 		user_id TEXT NOT NULL DEFAULT '',
 		book_id TEXT NOT NULL,
 		section INTEGER NOT NULL DEFAULT 0,
+		scroll_position REAL NOT NULL DEFAULT 0.0,
 		progress REAL NOT NULL DEFAULT 0.0,
 		total_sections INTEGER NOT NULL DEFAULT 0,
 		status TEXT NOT NULL DEFAULT 'reading',

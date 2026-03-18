@@ -2377,7 +2377,7 @@
 
                 <!-- Single page mode -->
                 <template v-else-if="readerMode === 'single'">
-                    <div class="reader-body" ref="readerBody">
+                    <div class="reader-body" ref="readerBody" @scroll="onScrollReaderBody">
                         <div class="reader-page-single">
                             <div class="reader-content" :style="readerFontStyle" v-html="readerHTML"></div>
                         </div>
@@ -2386,7 +2386,7 @@
 
                 <!-- Spread mode (two pages) -->
                 <template v-else-if="readerMode === 'spread'">
-                    <div class="reader-body" ref="readerBody">
+                    <div class="reader-body" ref="readerBody" @scroll="onScrollReaderBody">
                         <div class="reader-page-spread">
                             <div class="reader-page-half">
                                 <div class="reader-content" :style="readerFontStyle" v-html="readerHTML"></div>
@@ -2606,6 +2606,7 @@
                     ttsSettingsOpen: false,
                     ttsError: '',
                     ttsChunks: [],      // Array of text chunks for current section
+                    ttsChunkStartPara: [], // Paragraph index where each chunk begins (for auto-scroll)
                     ttsChunkIndex: 0,   // Current chunk being played
                     _ttsPrefetchedBlob: null, // Prefetched audio blob for next chunk
                     _ttsPrefetchIndex: -1,    // Index of the prefetched chunk
@@ -3163,6 +3164,10 @@
                             if (posRes.data && posRes.data.section > 0) {
                                 this.readerSection = posRes.data.section;
                             }
+                            // Store pending scroll position to restore after content loads
+                            if (posRes.data && posRes.data.scroll_position > 0) {
+                                this._pendingScrollPosition = posRes.data.scroll_position;
+                            }
                         } catch (e) { /* no saved position */ }
 
                         // Load content
@@ -3175,8 +3180,8 @@
                 },
 
                 closeReader() {
-                    this.savePosition();
                     this.stopTTS();
+                    this.savePosition();
                     this.currentView = 'library';
                     this.readerBook = null;
                     this.readerSettingsOpen = false;
@@ -3219,21 +3224,53 @@
                             this.readerScrollLoadedMax = index;
                         }
 
-                        // Scroll to top
-                        this.$nextTick(() => {
-                            if (this.$refs.readerBody) {
-                                this.$refs.readerBody.scrollTop = 0;
-                            }
-                        });
-
-                        // Auto-save position with debounce
-                        this.debounceSavePosition();
+                        // Restore scroll position or scroll to top
+                        if (this._pendingScrollPosition > 0) {
+                            const scrollFraction = this._pendingScrollPosition;
+                            this._pendingScrollPosition = 0;
+                            // Flag to suppress save during restoration
+                            this._restoringScroll = true;
+                            this.$nextTick(() => {
+                                this._tryRestoreScroll(scrollFraction, 0);
+                            });
+                        } else {
+                            this.$nextTick(() => {
+                                if (this.$refs.readerBody) {
+                                    this.$refs.readerBody.scrollTop = 0;
+                                }
+                                // Only auto-save when NOT restoring a position
+                                this.debounceSavePosition();
+                            });
+                        }
                     } catch (error) {
                         console.error('Error loading section:', error);
                         this.readerHTML = '<p style="color:red">Ошибка загрузки раздела</p>';
                     } finally {
                         this.readerLoading = false;
                     }
+                },
+
+                // Retry scroll restoration until content is laid out (maxScroll > 0)
+                _tryRestoreScroll(fraction, attempt) {
+                    const MAX_ATTEMPTS = 20; // ~330ms total
+                    requestAnimationFrame(() => {
+                        const body = this.$refs.readerBody;
+                        if (!body) {
+                            this._restoringScroll = false;
+                            return;
+                        }
+                        const maxScroll = body.scrollHeight - body.clientHeight;
+                        if (maxScroll > 0) {
+                            body.scrollTop = fraction * maxScroll;
+                            // Clear flag after a tick so the scroll event doesn't trigger a save
+                            setTimeout(() => { this._restoringScroll = false; }, 200);
+                        } else if (attempt < MAX_ATTEMPTS) {
+                            this._tryRestoreScroll(fraction, attempt + 1);
+                        } else {
+                            // Give up — content might genuinely fit in viewport
+                            this._restoringScroll = false;
+                        }
+                    });
                 },
 
                 goToSection(index) {
@@ -3276,10 +3313,17 @@
                 },
 
                 async onScrollReaderBody() {
-                    if (this.readerMode !== 'scroll' || this.readerScrollLoading) return;
+                    // Skip all processing while programmatically restoring scroll position
+                    if (this._restoringScroll) return;
 
                     const body = this.$refs.readerBody;
                     if (!body) return;
+
+                    // Save scroll position on any user scroll (all modes)
+                    this.debounceSavePosition();
+
+                    // Scroll-mode specific: lazy loading and section tracking
+                    if (this.readerMode !== 'scroll' || this.readerScrollLoading) return;
 
                     // Lazy load next section when near bottom
                     const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 500;
@@ -3322,6 +3366,7 @@
                 },
 
                 debounceSavePosition() {
+                    if (this._restoringScroll) return;
                     clearTimeout(this.readerPositionSaveTimer);
                     this.readerPositionSaveTimer = setTimeout(() => {
                         this.savePosition();
@@ -3331,8 +3376,17 @@
                 async savePosition() {
                     if (!this.readerBook) return;
                     try {
+                        // Calculate scroll position as fraction 0.0–1.0
+                        let scrollPos = 0;
+                        const body = this.$refs.readerBody;
+                        if (body && body.scrollHeight > body.clientHeight) {
+                            scrollPos = body.scrollTop / (body.scrollHeight - body.clientHeight);
+                            scrollPos = Math.max(0, Math.min(1, scrollPos));
+                        }
+
                         await axios.put(`${this.apiBase}/books/${this.readerBook.id}/position`, {
                             section: this.readerSection,
+                            scroll_position: scrollPos,
                             progress: this.readerTotalSections > 0
                                 ? this.readerSection / this.readerTotalSections
                                 : 0,
@@ -3445,10 +3499,13 @@
                     this.ttsLoading = false;
                     this.ttsError = '';
                     this.ttsChunks = [];
+                    this.ttsChunkStartPara = [];
                     this.ttsChunkIndex = 0;
                     this._ttsPrefetchedBlob = null;
                     this._ttsPrefetchIndex = -1;
                     this.stopTTSTimer();
+                    // Save reading position so we can resume from where TTS stopped
+                    this.savePosition();
                     // Abort pending TTS requests (playback + prefetch)
                     if (this._ttsAbortController) {
                         this._ttsAbortController.abort();
@@ -3492,6 +3549,7 @@
                     }
 
                     this.ttsChunks = result.chunks;
+                    this.ttsChunkStartPara = result.chunkStartPara;
 
                     // Find which chunk corresponds to the user's current reading position
                     const visiblePara = this.getFirstVisibleParagraphIndex();
@@ -3522,6 +3580,48 @@
 
                     // Start playing from the detected chunk
                     this.playTTSChunk(sectionIndex);
+                },
+
+                /**
+                 * Auto-scroll the reader to show the paragraph where the
+                 * current TTS chunk starts. Smooth scroll so the user sees
+                 * where reading is happening.
+                 */
+                scrollToTTSChunk() {
+                    if (!this.ttsChunkStartPara || this.ttsChunkStartPara.length === 0) return;
+                    const paraIndex = this.ttsChunkStartPara[this.ttsChunkIndex];
+                    if (paraIndex == null) return;
+
+                    const container = this.$refs.readerBody;
+                    if (!container) return;
+
+                    let content = null;
+                    if (this.readerMode === 'scroll') {
+                        const sections = container.querySelectorAll('.scroll-section');
+                        const cRect = container.getBoundingClientRect();
+                        for (const sec of sections) {
+                            if (sec.getBoundingClientRect().bottom > cRect.top) {
+                                content = sec.querySelector('.reader-content');
+                                break;
+                            }
+                        }
+                    } else {
+                        content = container.querySelector('.reader-content');
+                    }
+                    if (!content) return;
+
+                    const blocks = content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre');
+                    // Find the DOM element matching paraIndex (skip empty blocks like splitSectionIntoChunks does)
+                    let idx = 0;
+                    for (const block of blocks) {
+                        const text = (block.textContent || '').trim();
+                        if (text.length === 0) continue;
+                        if (idx === paraIndex) {
+                            block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            return;
+                        }
+                        idx++;
+                    }
                 },
 
                 /**
@@ -3649,6 +3749,9 @@
                         };
 
                         await this.ttsAudio.play();
+
+                        // Auto-scroll reader to show the paragraph being read
+                        this.scrollToTTSChunk();
                     } catch (error) {
                         // Ignore abort errors (user cancelled)
                         if (error.name === 'AbortError' || (error.code === 'ERR_CANCELED')) {

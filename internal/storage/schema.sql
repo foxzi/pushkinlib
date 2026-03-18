@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS reading_positions (
     user_id TEXT NOT NULL DEFAULT '',
     book_id TEXT NOT NULL,
     section INTEGER NOT NULL DEFAULT 0,
+    scroll_position REAL NOT NULL DEFAULT 0.0,
     progress REAL NOT NULL DEFAULT 0.0,
     total_sections INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'reading',

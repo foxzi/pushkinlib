@@ -999,13 +999,13 @@ func (r *Repository) ClearAllBooks() error {
 // userID is empty string when auth is disabled.
 func (r *Repository) GetReadingPosition(userID, bookID string) (*ReadingPosition, error) {
 	row := r.db.db.QueryRow(
-		`SELECT user_id, book_id, section, progress, total_sections, status, started_at, updated_at
+		`SELECT user_id, book_id, section, scroll_position, progress, total_sections, status, started_at, updated_at
 		 FROM reading_positions WHERE user_id = ? AND book_id = ?`,
 		userID, bookID,
 	)
 
 	var pos ReadingPosition
-	err := row.Scan(&pos.UserID, &pos.BookID, &pos.Section, &pos.Progress,
+	err := row.Scan(&pos.UserID, &pos.BookID, &pos.Section, &pos.ScrollPosition, &pos.Progress,
 		&pos.TotalSections, &pos.Status, &pos.StartedAt, &pos.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1031,10 +1031,11 @@ func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 	}
 
 	_, err := r.db.db.Exec(
-		`INSERT INTO reading_positions (user_id, book_id, section, progress, total_sections, status, started_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`INSERT INTO reading_positions (user_id, book_id, section, scroll_position, progress, total_sections, status, started_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		 ON CONFLICT(user_id, book_id) DO UPDATE SET
 		   section = excluded.section,
+		   scroll_position = excluded.scroll_position,
 		   progress = excluded.progress,
 		   total_sections = CASE
 		     WHEN excluded.total_sections > 0 THEN excluded.total_sections
@@ -1042,7 +1043,7 @@ func (r *Repository) SaveReadingPosition(pos *ReadingPosition) error {
 		   END,
 		   status = ?,
 		   updated_at = CURRENT_TIMESTAMP`,
-		pos.UserID, pos.BookID, pos.Section, pos.Progress, pos.TotalSections, status, status,
+		pos.UserID, pos.BookID, pos.Section, pos.ScrollPosition, pos.Progress, pos.TotalSections, status, status,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save reading position: %w", err)
