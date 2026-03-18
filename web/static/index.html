@@ -2607,6 +2607,8 @@
                     ttsError: '',
                     ttsChunks: [],      // Array of text chunks for current section
                     ttsChunkIndex: 0,   // Current chunk being played
+                    _ttsPrefetchedBlob: null, // Prefetched audio blob for next chunk
+                    _ttsPrefetchIndex: -1,    // Index of the prefetched chunk
                     // TTS sleep timer
                     ttsTimerMinutes: 30, // User-selected timer duration in minutes
                     ttsTimerRemaining: 0, // Seconds remaining (0 = timer not running)
@@ -3444,11 +3446,17 @@
                     this.ttsError = '';
                     this.ttsChunks = [];
                     this.ttsChunkIndex = 0;
+                    this._ttsPrefetchedBlob = null;
+                    this._ttsPrefetchIndex = -1;
                     this.stopTTSTimer();
-                    // Abort pending TTS request if any
+                    // Abort pending TTS requests (playback + prefetch)
                     if (this._ttsAbortController) {
                         this._ttsAbortController.abort();
                         this._ttsAbortController = null;
+                    }
+                    if (this._ttsPrefetchController) {
+                        this._ttsPrefetchController.abort();
+                        this._ttsPrefetchController = null;
                     }
                     if (this.ttsAudio) {
                         this.ttsAudio.pause();
@@ -3516,10 +3524,57 @@
                     this.playTTSChunk(sectionIndex);
                 },
 
+                /**
+                 * Prefetch the next TTS chunk in the background.
+                 * Stores result in _ttsPrefetchedBlob / _ttsPrefetchIndex
+                 * so playTTSChunk() can use it instantly.
+                 */
+                prefetchNextChunk(sectionIndex) {
+                    const nextIndex = this.ttsChunkIndex + 1;
+
+                    // Nothing to prefetch if we're at the last chunk or already prefetched
+                    if (nextIndex >= this.ttsChunks.length) return;
+                    if (this._ttsPrefetchIndex === nextIndex && this._ttsPrefetchedBlob) return;
+                    if (!this.ttsPlaying) return;
+
+                    // Abort any in-flight prefetch
+                    if (this._ttsPrefetchController) {
+                        this._ttsPrefetchController.abort();
+                    }
+                    this._ttsPrefetchController = new AbortController();
+                    this._ttsPrefetchIndex = -1;
+                    this._ttsPrefetchedBlob = null;
+
+                    const chunkText = this.ttsChunks[nextIndex];
+
+                    axios.post(`${this.apiBase}/tts/speech`, {
+                        input: chunkText,
+                        voice: this.ttsVoice,
+                        speed: this.ttsSpeed,
+                        model: 'v5_ru',
+                        response_format: 'mp3'
+                    }, {
+                        responseType: 'blob',
+                        signal: this._ttsPrefetchController.signal
+                    }).then(response => {
+                        if (!this.ttsPlaying) return;
+                        this._ttsPrefetchedBlob = new Blob([response.data], { type: 'audio/mpeg' });
+                        this._ttsPrefetchIndex = nextIndex;
+                    }).catch(err => {
+                        // Silently ignore prefetch errors — playTTSChunk will
+                        // fall back to a fresh request if prefetch is missing
+                        if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
+                            console.warn('TTS prefetch failed (non-critical):', err);
+                        }
+                    });
+                },
+
                 async playTTSChunk(sectionIndex) {
                     if (!this.ttsPlaying || this.ttsChunkIndex >= this.ttsChunks.length) {
                         // All chunks played — advance to next section or stop
                         this.ttsLoading = false;
+                        this._ttsPrefetchedBlob = null;
+                        this._ttsPrefetchIndex = -1;
                         if (this.ttsContinuous && this.ttsPlaying && sectionIndex + 1 < this.readerTotalSections) {
                             this.nextSection();
                             this.$nextTick(() => {
@@ -3532,35 +3587,50 @@
                         return;
                     }
 
-                    this.ttsLoading = true;
-                    const chunkText = this.ttsChunks[this.ttsChunkIndex];
-
-                    // Create abort controller for this request
-                    if (this._ttsAbortController) {
-                        this._ttsAbortController.abort();
-                    }
-                    this._ttsAbortController = new AbortController();
-
                     try {
-                        const response = await axios.post(`${this.apiBase}/tts/speech`, {
-                            input: chunkText,
-                            voice: this.ttsVoice,
-                            speed: this.ttsSpeed,
-                            model: 'v5_ru',
-                            response_format: 'mp3'
-                        }, {
-                            responseType: 'blob',
-                            signal: this._ttsAbortController.signal
-                        });
+                        let audioBlob;
 
-                        // Check if user stopped while we were loading
-                        if (!this.ttsPlaying) return;
+                        // Check if we have a prefetched blob for this chunk
+                        if (this._ttsPrefetchIndex === this.ttsChunkIndex && this._ttsPrefetchedBlob) {
+                            audioBlob = this._ttsPrefetchedBlob;
+                            this._ttsPrefetchedBlob = null;
+                            this._ttsPrefetchIndex = -1;
+                            // Prefetch hit — no loading spinner needed
+                        } else {
+                            // No prefetch available — synthesize synchronously
+                            this.ttsLoading = true;
+                            const chunkText = this.ttsChunks[this.ttsChunkIndex];
 
-                        const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+                            // Create abort controller for this request
+                            if (this._ttsAbortController) {
+                                this._ttsAbortController.abort();
+                            }
+                            this._ttsAbortController = new AbortController();
+
+                            const response = await axios.post(`${this.apiBase}/tts/speech`, {
+                                input: chunkText,
+                                voice: this.ttsVoice,
+                                speed: this.ttsSpeed,
+                                model: 'v5_ru',
+                                response_format: 'mp3'
+                            }, {
+                                responseType: 'blob',
+                                signal: this._ttsAbortController.signal
+                            });
+
+                            // Check if user stopped while we were loading
+                            if (!this.ttsPlaying) return;
+
+                            audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+                        }
+
                         const audioUrl = URL.createObjectURL(audioBlob);
 
                         this.ttsAudio = new Audio(audioUrl);
                         this.ttsLoading = false;
+
+                        // Start prefetching the NEXT chunk while this one plays
+                        this.prefetchNextChunk(sectionIndex);
 
                         this.ttsAudio.onended = () => {
                             URL.revokeObjectURL(audioUrl);
